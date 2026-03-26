@@ -1,0 +1,15 @@
+env.config
+env.config.*
+!env.config.template
+.env
+*.bak
+backups/
+logs/
+*.key
+*.pem
+__pycache__/
+*.pyc
+.venv/
+.DS_Store
+static/senate-seal.png
+static/capitol-background.jpg
