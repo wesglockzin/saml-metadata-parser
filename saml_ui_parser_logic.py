@@ -1,17 +1,31 @@
 #!/usr/bin/env python3
 import base64
+import re
 from lxml import etree
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+
+# Matches a bare & not already part of a valid XML entity reference
+_BARE_AMP_RE = re.compile(rb'&(?!(?:[a-zA-Z][a-zA-Z0-9]*|#[0-9]+|#x[0-9a-fA-F]+);)')
 
 NAMESPACES = {
     "md": "urn:oasis:names:tc:SAML:2.0:metadata",
     "ds": "http://www.w3.org/2000/09/xmldsig#"
 }
 
+# Clark-notation URIs for namespace-prefix-agnostic lookups
+_NS_MD   = "urn:oasis:names:tc:SAML:2.0:metadata"
+_NS_DS   = "http://www.w3.org/2000/09/xmldsig#"
+
 def load_xml_bytes(b):
-    return etree.fromstring(b)
+    try:
+        return etree.fromstring(b)
+    except etree.XMLSyntaxError:
+        # Retry after escaping bare & characters — common in metadata URLs
+        # (e.g. Location="https://sp.example.com/acs?foo=bar&binding=post")
+        sanitized = _BARE_AMP_RE.sub(b'&amp;', b)
+        return etree.fromstring(sanitized)
 
 def to_pem(b64_der):
     der = base64.b64decode(b64_der.encode("ascii"))
@@ -96,6 +110,27 @@ def parse_cert_details(pem):
     }
     return details
 
+def _find_cert_text(kd):
+    """
+    Extract X509Certificate text from a KeyDescriptor regardless of how the
+    xmldsig namespace is declared — ds: prefix, bare xmlns default, or any
+    other prefix. Uses Clark-notation URI matching so prefix doesn't matter.
+    """
+    ki_tag  = f"{{{_NS_DS}}}KeyInfo"
+    x9_tag  = f"{{{_NS_DS}}}X509Data"
+    xc_tag  = f"{{{_NS_DS}}}X509Certificate"
+
+    # Walk the KeyDescriptor subtree looking for the certificate element.
+    # lxml always resolves Clark notation regardless of the prefix used in
+    # the source document.
+    for ki in kd.iter(ki_tag):
+        for x9 in ki.iter(x9_tag):
+            for xc in x9.iter(xc_tag):
+                if xc.text and xc.text.strip():
+                    return xc.text.strip()
+    return None
+
+
 def parse_metadata(xml_root):
     entity_id = xml_root.get("entityID")
     idpsso = xml_root.find("md:IDPSSODescriptor", namespaces=NAMESPACES)
@@ -133,10 +168,15 @@ def parse_metadata(xml_root):
     for kd_parent in roles:
         for kd in kd_parent.findall("md:KeyDescriptor", namespaces=NAMESPACES):
             use = kd.get("use") or "unspecified"
-            cert_el = kd.find("ds:KeyInfo/ds:X509Data/ds:X509Certificate", namespaces=NAMESPACES)
-            if cert_el is not None and cert_el.text:
-                pem = to_pem(cert_el.text.strip())
-                details = parse_cert_details(pem)
+            cert_text = _find_cert_text(kd)
+            if cert_text:
+                pem = to_pem(cert_text)
+                try:
+                    details = parse_cert_details(pem)
+                except Exception as e:
+                    # Non-standard encoding (e.g. GeneralizedTime in validity) —
+                    # return a minimal stub so the cert PEM is still surfaced
+                    details = {"parse_error": str(e)}
                 if use == "encryption":
                     certs_encryption.append(pem)
                     certs_encryption_details.append(details)

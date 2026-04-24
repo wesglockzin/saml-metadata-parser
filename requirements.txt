@@ -3,5 +3,5 @@ gunicorn==21.2.0
 lxml==5.1.0
 cryptography==42.0.0
 python-dotenv==1.0.0
-Flask-Session
+python-jose[cryptography]
 requests

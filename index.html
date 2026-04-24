@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SAML Metadata Parser UI</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css"/>
-  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
   <style>
     :root { font-size: 87.5%; }
     
@@ -152,15 +151,27 @@
     .separator::before { left: 0; }
     .separator::after { right: 0; }
 
-    .turnstile-wrapper {
-        margin: 1rem 0;
-        min-height: 65px;
+    .user-bar {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 0.75rem;
+        font-size: 0.85rem;
+        color: var(--pico-muted-color);
+        margin-bottom: 0.5rem;
     }
+    .user-bar a { font-size: 0.85rem; }
 
   </style>
 </head>
 <body>
   <main class="container">
+    {% if user_email %}
+    <div class="user-bar">
+      <span>{{ user_email }}</span>
+      <a href="{{ url_for('logout') }}">Sign out</a>
+    </div>
+    {% endif %}
     <hgroup>
       <h1>SAML Metadata Parser</h1>
       <p>Upload one or more SAML metadata XML files to inspect endpoints and certificates</p>
@@ -181,12 +192,6 @@
             <input type="file" id="metadata_files" name="metadata_files" accept=".xml" multiple>
             <ul id="file-list"></ul>
           </fieldset>
-
-          {% if turnstile_site_key %}
-          <div class="turnstile-wrapper">
-              <div class="cf-turnstile" data-sitekey="{{ turnstile_site_key }}"></div>
-          </div>
-          {% endif %}
 
           <button type="submit">Parse</button>
         </form>
@@ -271,6 +276,9 @@
                         
                         <details>
                             <summary>View details</summary>
+                            {% if d.parse_error %}
+                            <p style="color:#b71c1c;font-size:0.85em">⚠ Certificate has a non-standard encoding — details unavailable: {{ d.parse_error }}</p>
+                            {% else %}
                             <div class="kv">
                             <div>Subject</div><div class="mono">{{ d.subject }}</div>
                             <div>Issuer</div><div class="mono">{{ d.issuer }}</div>
@@ -284,6 +292,7 @@
                                 <summary>Public Key (SPKI DER hex)</summary>
                                 <pre><code>{{ d.public_key.spki_hex }}</code></pre>
                             </details>
+                            {% endif %}
                         </details>
                         <pre><code>{{ c }}</code></pre>
                         {% endfor %}
@@ -302,6 +311,9 @@
                         <p><a href="{{ url_for('download_cert', file_index=file_index, kind='encryption', cert_index=loop.index0) }}">Download encryption cert {{ loop.index }}</a></p>
                         <details>
                             <summary>View details</summary>
+                            {% if d.parse_error %}
+                            <p style="color:#b71c1c;font-size:0.85em">⚠ Certificate has a non-standard encoding — details unavailable: {{ d.parse_error }}</p>
+                            {% else %}
                             <div class="kv">
                             <div>Subject</div><div class="mono">{{ d.subject }}</div>
                             <div>Issuer</div><div class="mono">{{ d.issuer }}</div>
@@ -309,6 +321,7 @@
                             <div>Not Before</div><div class="mono">{{ d.not_before }}</div>
                             <div>Not After</div><div class="mono">{{ d.not_after }}</div>
                             </div>
+                            {% endif %}
                         </details>
                         <pre><code>{{ c }}</code></pre>
                         {% endfor %}
@@ -332,7 +345,7 @@
         Version: {{ app_version }} | 
         Theme: <a href="#" data-theme-switcher="light">Light</a> / <a href="#" data-theme-switcher="dark">Dark</a> | 
         <a href="{{ url_for('static', filename='SAML_METADATA_PARSER_WP.pdf') }}" target="_blank">Security White Paper</a> |
-        Contact: <a href="mailto:wes.glockzin@gmail.com">wes.glockzin@gmail.com</a>
+        Contact: <a href="mailto:maintainer@example.gov">maintainer@example.gov</a>
       </p>
     </footer>
   </main>

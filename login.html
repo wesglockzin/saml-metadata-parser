@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SAML Metadata Parser — Sign In</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css"/>
+  <style>
+    :root { font-size: 87.5%; }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      align-items: center;
+      justify-content: center;
+      background-color: var(--pico-background-color);
+    }
+
+    .login-wrapper {
+      width: 100%;
+      max-width: 480px;
+      padding: 1.5rem;
+    }
+
+    .login-card {
+      background: var(--pico-card-background-color);
+      border: var(--pico-card-border);
+      border-radius: var(--pico-card-border-radius);
+      padding: 2.5rem 2rem;
+      text-align: center;
+    }
+
+    .login-card h1 {
+      font-size: 1.4rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .login-card .subtitle {
+      color: var(--pico-muted-color);
+      font-size: 0.9rem;
+      margin-bottom: 2rem;
+    }
+
+    .btn-signin {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      padding: 0.75rem 1rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+
+    .ms-icon {
+      width: 20px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+
+    .error-box {
+      background-color: #fff3f3;
+      border: 1px solid #f5c2c7;
+      border-radius: var(--pico-border-radius);
+      color: #842029;
+      padding: 0.75rem 1rem;
+      margin-bottom: 1.25rem;
+      font-size: 0.875rem;
+      text-align: left;
+    }
+
+    footer {
+      margin-top: 1.5rem;
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--pico-muted-color);
+    }
+  </style>
+</head>
+<body>
+  <div class="login-wrapper">
+    <div class="login-card">
+      <h1>SAML Metadata Parser</h1>
+      <p class="subtitle">Sign in with your Senate development account to continue</p>
+
+      {% if login_error %}
+      <div class="error-box">{{ login_error }}</div>
+      {% endif %}
+
+      <a href="{{ url_for('azure_oidc_login') }}" role="button" class="btn-signin">
+        <!-- Microsoft icon SVG -->
+        <svg class="ms-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 21 21">
+          <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+          <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+          <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+          <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+        </svg>
+        Sign in
+      </a>
+    </div>
+
+    <footer>
+      SAML Metadata Parser v{{ app_version }} &mdash; Senate IAM Tools
+    </footer>
+  </div>
+</body>
+</html>
