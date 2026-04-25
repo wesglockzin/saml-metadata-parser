@@ -1,9 +1,9 @@
-# SAML Metadata Parser (Cloud Edition)
+# SAML Metadata Parser
 
-**Version:** 1.2.2  
+**Version:** 1.2.2
 **Status:** Production Ready
 
-A secure, serverless utility for parsing, visualizing, and debugging SAML 2.0 metadata. Hosted on Google Cloud Run, this tool allows Identity Engineers to instantly extract EntityIDs, endpoints, and decode X.509 certificates from raw XML or remote URLs.
+A secure, containerized utility for parsing, visualizing, and debugging SAML 2.0 metadata. Deployed on Azure Container Apps, this tool allows Identity Engineers to instantly extract EntityIDs, endpoints, and decode X.509 certificates from raw XML or remote URLs.
 
 ---
 
@@ -20,8 +20,9 @@ A secure, serverless utility for parsing, visualizing, and debugging SAML 2.0 me
 
 ## 🛠️ Technical Stack
 
-* **Platform:** Google Cloud Run (Managed)
-* **Runtime:** Python 3.11 (Pinned via `.python-version`)
+* **Platform:** Azure Container Apps (Managed)
+* **Container Registry:** Azure Container Registry (`my-acr`)
+* **Runtime:** Python 3.11
 * **Framework:** Flask 3.0.0 + Gunicorn
 * **XML Engine:** `lxml` 5.1.0
 * **Cryptography:** `cryptography` 42.0.0
@@ -30,7 +31,7 @@ A secure, serverless utility for parsing, visualizing, and debugging SAML 2.0 me
 
 ## ⚙️ Configuration
 
-The application relies on a `.env` file (or `env.config` in production) for sensitive keys.
+The application relies on a `.env` file (or Container Apps secrets in production) for sensitive keys.
 
 | Variable | Description |
 | :--- | :--- |
@@ -42,15 +43,28 @@ The application relies on a `.env` file (or `env.config` in production) for sens
 
 ## 📦 Deployment
 
-This project is configured for **Source-Based Deployment** to Google Cloud Run. It uses a `Procfile` to define the entry point and a `.python-version` file to force the build environment to Python 3.11.
+This project deploys as a Docker container to Azure Container Apps via the included scripts. The Container Apps environment is shared with sibling projects in the same resource group.
 
 ### Prerequisites
-* Google Cloud SDK (`gcloud`) installed and authenticated.
-* A Google Cloud Project with Cloud Run enabled.
 
-### Deploy Command
-Run the included helper script:
+* Azure CLI (`az`) installed and authenticated (`az login`)
+* Docker installed locally for image builds
+* Access to the `my-resource-group` resource group and `my-acr` Container Registry
+* Azure AD App Registration for OIDC (see `AZURE_AD_SETUP.md`)
+* Container App secrets configured: `FLASK_SECRET_KEY`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`, plus Azure AD OIDC credentials
+
+### Initial Setup (one-time)
 
 ```bash
-./deploy.sh
+./setup-azure.sh
 ```
+
+Creates the Container App in the existing environment, configures secrets, wires Azure AD authentication, and deploys the initial image.
+
+### Subsequent Deployments
+
+```bash
+./deploy.sh v1.2.3
+```
+
+Builds the Docker image, tags it with the supplied version, pushes to ACR, and updates the Container App revision. If no tag is supplied, the script prompts for one.
