@@ -1,9 +1,25 @@
+> **Parse, validate, and debug SAML 2.0 metadata — endpoint extraction,
+> X.509 cert decoding, fingerprint calculation, and expiry validation,
+> with SSRF mitigations and stateless design for safe public deployment.**
+
 # SAML Metadata Parser
 
 **Version:** 1.2.2
 **Status:** Production Ready
 
 A secure, containerized utility for parsing, visualizing, and debugging SAML 2.0 metadata. Deployed on Azure Container Apps, this tool allows Identity Engineers to instantly extract EntityIDs, endpoints, and decode X.509 certificates from raw XML or remote URLs.
+
+---
+
+### About this repo
+
+This is a sanitized snapshot of internal tooling, published via an
+automated review-and-publish pipeline. Internal identifiers
+(subscription IDs, resource group names, internal hostnames, email
+addresses) are deliberately replaced with placeholders like
+`your-subscription-id`, `your-acr-name`, and `your-org`. Replace
+these with values appropriate to your environment when adapting
+the code.
 
 ---
 
