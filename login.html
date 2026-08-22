@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <title>SAML Metadata Parser — Sign in</title>
+  <style>
+    body{margin:0;background:#0f172a;color:#e2e8f0;font:14px -apple-system,Segoe UI,Roboto,sans-serif;display:grid;place-items:center;min-height:100vh}
+    .card{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:40px;max-width:420px;width:90%;text-align:center}
+    h1{margin:0 0 8px;font-size:20px}
+    p{color:#94a3b8;margin:0 0 28px;font-size:13px}
+    a.btn{display:inline-block;background:#22c55e;color:#0f172a;text-decoration:none;padding:10px 22px;border-radius:8px;font-weight:600}
+    a.btn:hover{background:#16a34a;color:#fff}
+    .err{color:#fca5a5;font-size:12px;margin-top:16px}
+    .vpn{background:#1f2937;border:1px solid #f59e0b;color:#fbbf24;font-size:13px;margin-top:20px;padding:12px 14px;border-radius:8px;text-align:left;line-height:1.5}
+    .vpn b{color:#fde68a}
+    .vpn .raw{display:block;color:#94a3b8;font-size:11px;margin-top:8px;font-family:ui-monospace,Menlo,monospace;word-break:break-word}
+    footer{position:fixed;bottom:16px;left:0;right:0;text-align:center;font-size:11px;color:#475569}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>SAML Metadata Parser</h1>
+    <p>Sign in with your work email to continue.</p>
+    <a class="btn" href="/oidc/login">Sign in</a>
+    {% if login_error %}
+      {% if 'access_denied' in login_error %}
+      <div class="vpn">
+        <b>VPN required.</b> This app is restricted to the internal network. Connect to AnyConnect, then click Sign in again.
+        <span class="raw">{{ login_error }}</span>
+      </div>
+      {% else %}
+      <div class="err">{{ login_error }}</div>
+      {% endif %}
+    {% endif %}
+  </div>
+  <footer>SAML Metadata Parser v{{ app_version }} &middot; IAM Tools</footer>
+</body>
+</html>
