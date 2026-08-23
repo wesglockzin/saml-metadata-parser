@@ -99,13 +99,13 @@ No persistence. Each parse is request-scoped — the parsed structure is rendere
 ## Architecture (for the nerds)
 
 - **Stack:** Flask + gunicorn, deployed to Azure Container Apps in `your-resource-group`
-- **Auth:** OIDC via the shared "Okta Admin Tools" app; `before_request` enforcer
+- **Auth:** OIDC via the shared "Admin SSO App" app; `before_request` enforcer
 - **Parser:** custom XML parser in `saml_ui_parser_logic.py` — extracts every relevant element under the `urn:oasis:names:tc:SAML:2.0:metadata` namespace
 - **Cert decoding:** `cryptography` library — parses X.509 certs from base64-encoded `X509Certificate` elements, extracts subject/issuer/validity/fingerprint
 - **PEM generation:** wraps the cert DER in standard `-----BEGIN CERTIFICATE-----` framing, served with `attachment` content-disposition
-- **Identity (for fetch-URL mode):** `SAMLMetadataParser/<APP_VERSION> (wes-tools)` UA — once the wes_tools_http integration is added (this version added the in-tool HOWTO; the HTTP-identity layer landed in the earlier fleet sweep)
+- **Identity (for fetch-URL mode):** `SAMLMetadataParser/<APP_VERSION> (internal-tools)` UA — once the wes_tools_http integration is added (this version added the in-tool HOWTO; the HTTP-identity layer landed in the earlier fleet sweep)
 - **In-tool docs:** this page renders from `HOWTO.md` next to `app.py`, via `wes_tools_docs.register_howto()`
-- **Source:** `~/Projects/wes-tools/Azure Container Apps/SAML Metadata Parser/`
+- **Source:** `<internal-source-path>`
 
 ## What's not here yet
 

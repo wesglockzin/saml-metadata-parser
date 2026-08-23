@@ -1,86 +1,124 @@
-> **Parse, validate, and debug SAML 2.0 metadata — endpoint extraction,
-> X.509 cert decoding, fingerprint calculation, and expiry validation,
-> with SSRF mitigations and stateless design for safe public deployment.**
+> **Paste a SAML metadata URL or upload the XML — get the entity ID, the
+> role, every SSO/ACS endpoint with its binding, and each X.509 certificate
+> decoded with fingerprints and validity dates. The thing I open before
+> every federation ticket.**
 
 # SAML Metadata Parser
 
-**Version:** 1.2.2
-**Status:** Production Ready
-
-A secure, containerized utility for parsing, visualizing, and debugging SAML 2.0 metadata. Deployed on Azure Container Apps, this tool allows Identity Engineers to instantly extract EntityIDs, endpoints, and decode X.509 certificates from raw XML or remote URLs.
+A small Flask tool for reading SAML 2.0 metadata without squinting at XML.
+Runs on Azure Container Apps behind an Okta OIDC sign-in.
 
 ---
 
 ### About this repo
 
-This is a sanitized snapshot of internal tooling, published via an
-automated review-and-publish pipeline. Internal identifiers
-(subscription IDs, resource group names, internal hostnames, email
-addresses) are deliberately replaced with placeholders like
-`your-subscription-id`, `your-acr-name`, and `your-org`. Replace
-these with values appropriate to your environment when adapting
-the code.
+This is a sanitized snapshot of an internal tool, published through an
+automated review-and-publish pipeline. Internal hostnames, tenant and
+resource names are replaced with placeholders (`host.example.gov`,
+`your-resource-group`). The code is the code that runs; the configuration
+values are not.
 
 ---
 
-## 🚀 Features
+## What it does
 
-* **Universal Parsing:** Accepts both **File Uploads** (.xml) and **Remote URLs**.
-* **Certificate Intelligence:** Automatically decodes X.509 certificates, calculating SHA1/SHA256 fingerprints and checking validity dates.
-* **Endpoint Visualization:** Clearly lists ACS (Assertion Consumer Service) and SSO endpoints with their bindings.
-* **Bot Protection:** Integrated **Cloudflare Turnstile** (Managed Mode) to prevent automated abuse.
-* **SSRF Mitigation:** **[New in v1.2.2]** Strict validation blocks the server from fetching internal/private IP addresses (e.g., `169.254.169.254` or `localhost`).
-* **Privacy by Design:** Completely stateless architecture. No database is used; all data is wiped when the session ends.
+- **Two inputs:** upload a metadata `.xml`, or give it a URL to fetch.
+- **Extracts:** `entityID`, role (IdP / SP), SingleSignOnService and
+  AssertionConsumerService endpoints with bindings, and every
+  `KeyDescriptor` certificate (signing / encryption).
+- **Decodes each certificate:** subject, issuer, serial, validity window,
+  SHA-1 and SHA-256 fingerprints, key algorithm — and flags expired certs.
+- **Download any certificate as PEM** straight from the results page.
+- **Stateless:** no database; results live in the signed session cookie for
+  the life of the page.
 
----
+## How it protects itself
 
-## 🛠️ Technical Stack
+- **URL fetches are validated first** (`validate_safe_url`): the hostname is
+  resolved and refused if it lands on loopback, link-local (including
+  `169.254.169.254`), RFC 1918, or IPv6-local space.
+- **XML is parsed with lxml's default parser**, which does not resolve
+  external entities and caps entity expansion — verified with a `file://`
+  entity and a billion-laughs payload.
+- **Security headers** on every response (HSTS in production, CSP,
+  `X-Frame-Options`, `nosniff`).
+- **Sign-in gate:** Okta OIDC, authorization code + PKCE, `state`/`nonce`
+  validated by Authlib. Access is decided by assignment on the Okta app.
 
-* **Platform:** Azure Container Apps (Managed)
-* **Container Registry:** Azure Container Registry (`your-acr-name`)
-* **Runtime:** Python 3.11
-* **Framework:** Flask 3.0.0 + Gunicorn
-* **XML Engine:** `lxml` 5.1.0
-* **Cryptography:** `cryptography` 42.0.0
+## Project layout
 
----
+| File | Role |
+|---|---|
+| `app.py` | Flask app — auth gate, `/parse`, `/download_cert`, headers |
+| `saml_ui_parser_logic.py` | Metadata parsing and certificate decoding |
+| `index.html`, `login.html` | Templates |
+| `HOWTO.md` | In-app help, rendered at `/howto` |
+| `smoke_test.py` | Pre-deploy static checks |
+| `Dockerfile`, `setup-azure.sh` | Container image and one-time Azure Container Apps setup |
 
-## ⚙️ Configuration
+## Routes
 
-The application relies on a `.env` file (or Container Apps secrets in production) for sensitive keys.
+| Route | Purpose |
+|---|---|
+| `/` | Form and results |
+| `/parse` `POST` | Parse an uploaded file or a fetched URL |
+| `/download_cert` | Return one parsed certificate as PEM |
+| `/login`, `/oidc/login`, `/oidc/callback`, `/logout` | The tool's sign-in gate |
+| `/howto` | In-app help |
+| `/health` | Liveness |
 
-| Variable | Description |
-| :--- | :--- |
-| `FLASK_SECRET_KEY` | Random string for signing session cookies. |
-| `TURNSTILE_SITE_KEY` | Public key for Cloudflare Turnstile widget. |
-| `TURNSTILE_SECRET_KEY` | Secret key for Cloudflare API verification. |
+## Configuration
 
----
+| Variable | Required | Purpose |
+|---|---|---|
+| `FLASK_SECRET_KEY` | yes | Session signing — must be identical across gunicorn workers |
+| `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | for the gate | The tool's own Okta OIDC client |
+| `APP_BASE_URL` | yes | Public base URL; drives the redirect URI and cookie flags |
 
-## 📦 Deployment
+Locally these come from `env.config` (never committed — see
+`env.config.template`); in Azure Container Apps they are secrets injected as
+environment variables. **If the `OIDC_*` variables are unset the gate is
+disabled and the app serves open** — fine on a laptop, see *Known limitations*.
 
-This project deploys as a Docker container to Azure Container Apps via the included scripts. The Container Apps environment is shared with sibling projects in the same resource group.
-
-### Prerequisites
-
-* Azure CLI (`az`) installed and authenticated (`az login`)
-* Docker installed locally for image builds
-* Access to the `your-resource-group` resource group and `your-acr-name` Container Registry
-* Azure AD App Registration for OIDC (see `AZURE_AD_SETUP.md`)
-* Container App secrets configured: `FLASK_SECRET_KEY`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`, plus Azure AD OIDC credentials
-
-### Initial Setup (one-time)
+## Running it
 
 ```bash
-./setup-azure.sh
+pip install -r requirements.txt
+cp env.config.template env.config   # fill in values
+python app.py                       # http://localhost:8081
 ```
 
-Creates the Container App in the existing environment, configures secrets, wires Azure AD authentication, and deploys the initial image.
+Deployment is Azure Container Apps (gunicorn, 2 workers × 4 threads).
+`setup-azure.sh` creates the container app once; after that, images are built
+and promoted by the fleet's shared scripts — build → DEV, then a digest-gated
+DEV → PROD promotion — rather than by a per-tool deploy script.
 
-### Subsequent Deployments
+## Known limitations
 
-```bash
-./deploy.sh v1.2.3
-```
+Real, known, and in the order I intend to fix them.
 
-Builds the Docker image, tags it with the supplied version, pushes to ACR, and updates the Container App revision. If no tag is supplied, the script prompts for one.
+- **Redirects are followed after validation.** `validate_safe_url` checks the
+  URL you typed, but the fetch follows HTTP redirects, so an allowed host that
+  302s to an internal address is not re-checked. The fetch also currently
+  disables TLS verification. Both are next.
+- **Gate fails open when unconfigured** (see *Configuration*). A fail-closed
+  startup check belongs in production deployments.
+- **Multi-certificate metadata can overflow the session cookie** (~4 KB),
+  which drops the results and the certificate download.
+- **`EntitiesDescriptor` wrappers** (aggregate / federation metadata) are not
+  unwrapped — only a top-level `EntityDescriptor` parses.
+- **CSP directives are missing separators** in the current header string, so
+  browsers don't apply the style/font/img directives as written.
+- No automated tests beyond `smoke_test.py`; no CI yet.
+
+## Version
+
+`APP_VERSION` in `app.py` is authoritative (currently 2.1.x).
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+## Author
+
+Wes Glockzin

@@ -33,6 +33,23 @@ COPY . .
 # Change ownership to non-root user
 RUN chown -R appuser:appuser /app
 
+# OpenShift compatibility — REQUIRED, not cosmetic.
+#
+# `restricted-v2` IGNORES the USER line below and runs the container as an
+# arbitrary UID from the namespace's assigned range, always in GID 0. With only
+# `chown -R appuser:appuser`, that UID is in neither the owning user nor the
+# owning group, so /app is not even READABLE by it and gunicorn dies at import:
+#
+#   PermissionError: [Errno 13] Permission denied: '/app/saml_ui_parser_logic.py'
+#
+# Proven on the-cluster 2026-08-13 — and note it failed on a READ, in a tool that
+# writes nothing. The blocker is not the "writes next to app.py" pattern the
+# survey described; it applies to every image built this way.
+#
+# Giving group 0 the same rights as the owner is the standard OpenShift image
+# convention and is a no-op on ACA, which honours USER appuser normally.
+RUN chgrp -R 0 /app && chmod -R g=u /app
+
 # Switch to non-root user
 USER appuser
 

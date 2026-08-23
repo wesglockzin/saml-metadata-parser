@@ -3,7 +3,7 @@
 # Run this ONCE to create the Container App. Subsequent deployments use deploy.sh.
 #
 # Prerequisites:
-#   - az login (service principal): see MEMORY.md for the the organization SP re-login command
+#   - az login (service principal): see MEMORY.md for the organization SP re-login command
 #   - Azure AD App Registration created (see AZURE_AD_SETUP.md)
 #   - Secrets ready: FLASK_SECRET_KEY, AZURE_OIDC_CLIENT_ID, AZURE_OIDC_CLIENT_SECRET, AZURE_OIDC_TENANT_ID
 
@@ -84,17 +84,17 @@ APP_URL=$(az containerapp show \
 
 echo "==========================================="
 echo "  Container App created!"
-echo "  URL: https://host.example.gov"
+echo "  URL: https://$APP_URL"
 echo "==========================================="
 echo ""
 echo "NEXT STEPS:"
 echo "  1. Update APP_BASE_URL in the Container App env vars:"
-echo "     az containerapp update --name $APP_NAME --resource-group $RESOURCE_GROUP \\"
-echo "       --set-env-vars APP_BASE_URL=https://host.example.gov"
+echo "     See docs/HAND_RUN_PROCEDURES.md section 3 for the exact"
+echo "     command. APP_BASE_URL should be https://$APP_URL"
 echo ""
 echo "  2. Update the Azure AD App Registration redirect URI to:"
-echo "     https://host.example.gov"
+echo "     https://$APP_URL/azure/oidc/callback"
 echo "     (See AZURE_AD_SETUP.md)"
 echo ""
-echo "  3. For subsequent deployments, use: ./deploy.sh <version>"
+echo "  Subsequent deploys: ./scripts/fleet-deploy.sh <tool> --dev --execute"
 echo "==========================================="

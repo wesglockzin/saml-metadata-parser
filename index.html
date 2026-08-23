@@ -191,6 +191,13 @@
             <label for="metadata_files">Upload File(s)</label>
             <input type="file" id="metadata_files" name="metadata_files" accept=".xml" multiple>
             <ul id="file-list"></ul>
+
+            <div class="separator">OR</div>
+
+            <label for="metadata_raw">Paste Raw XML</label>
+            <textarea id="metadata_raw" name="metadata_raw" rows="6"
+                      placeholder="&lt;md:EntityDescriptor xmlns:md=&quot;urn:oasis:names:tc:SAML:2.0:metadata&quot; ...&gt;"
+                      style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85em;"></textarea>
           </fieldset>
 
           <button type="submit">Parse</button>
@@ -344,8 +351,7 @@
       <p>
         Version: {{ app_version }} | 
         Theme: <a href="#" data-theme-switcher="light">Light</a> / <a href="#" data-theme-switcher="dark">Dark</a> | 
-        <a href="{{ url_for('static', filename='SAML_METADATA_PARSER_WP.pdf') }}" target="_blank">Security White Paper</a> |
-        Contact: <a href="mailto:maintainer@example.gov">maintainer@example.gov</a>
+        Contact: <a href="mailto:maintainer@host.example.gov">maintainer@host.example.gov</a>
       </p>
     </footer>
   </main>

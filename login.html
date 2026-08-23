@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <title>SAML Metadata Parser — Sign in</title>
   <style>
-    body{margin:0;background:#0f172a;color:#e2e8f0;font:14px -apple-system,Segoe UI,Roboto,sans-serif;display:grid;place-items:center;min-height:100vh}
+    body{margin:0;background:#0f172a;color:#e2e8f0;font:14px -apple-system,Segoe UI,Roboto,ExampleApp-serif;display:grid;place-items:center;min-height:100vh}
     .card{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:40px;max-width:420px;width:90%;text-align:center}
     h1{margin:0 0 8px;font-size:20px}
     p{color:#94a3b8;margin:0 0 28px;font-size:13px}
@@ -25,7 +25,7 @@
     {% if login_error %}
       {% if 'access_denied' in login_error %}
       <div class="vpn">
-        <b>VPN required.</b> This app is restricted to the internal network. Connect to AnyConnect, then click Sign in again.
+        <b>VPN required.</b> This app is restricted to the internal network. Connect to the VPN client, then click Sign in again.
         <span class="raw">{{ login_error }}</span>
       </div>
       {% else %}
@@ -33,6 +33,6 @@
       {% endif %}
     {% endif %}
   </div>
-  <footer>SAML Metadata Parser v{{ app_version }} &middot; IAM Tools</footer>
+  <footer>SAML Metadata Parser v{{ app_version }}</footer>
 </body>
 </html>

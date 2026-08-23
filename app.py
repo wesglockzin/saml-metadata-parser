@@ -3,9 +3,9 @@
 # Script Name : app.py (SAML Metadata Parser - Azure Container Apps Edition)
 # Description : Flask web application for parsing and visualizing SAML 2.0
 #               metadata. PROD Okta OIDC authentication gate via the shared
-#               "Okta Admin Tools" OIDC app, Authlib-driven flow.
+#               "Admin SSO App" OIDC app, Authlib-driven flow.
 # Author      : Wes Glockzin
-# Version     : 2.1.0 (Entra → PROD Okta OIDC migration via Okta Admin Tools)
+# Version     : 2.1.0 (Entra → PROD Okta OIDC migration via Admin SSO App)
 # License     : MIT
 # -----------------------------------------------------------------------------
 
@@ -29,7 +29,7 @@ from saml_ui_parser_logic import parse_file_bytes, sanitize_filename
 from wes_tools_docs import register_howto
 
 # --- VERSION ---
-APP_VERSION = "2.1.1"
+APP_VERSION = "2.1.5"
 
 # --- Environment Loading ---
 APP_DIR = Path(__file__).resolve().parent
@@ -52,7 +52,7 @@ logger = logging.getLogger(__name__)
 # --- Environment Detection ---
 IS_AZURE = bool(os.environ.get("CONTAINER_APP_NAME") or os.environ.get("KUBERNETES_SERVICE_HOST"))
 
-# --- OIDC Config (PROD Okta via "Okta Admin Tools" app) ---
+# --- OIDC Config (PROD Okta via "Admin SSO App" app) ---
 FLASK_SECRET_KEY = os.environ.get("FLASK_SECRET_KEY") or os.urandom(32).hex()
 OIDC_ISSUER = os.environ.get("OIDC_ISSUER", "").rstrip("/")
 OIDC_CLIENT_ID = os.environ.get("OIDC_CLIENT_ID", "")
@@ -158,11 +158,14 @@ def require_login():
     if request.path in PUBLIC_PATHS:
         return
     if not session.get("user"):
-        return redirect(url_for("login", next=request.path))
+        # Straight to the IdP — no intermediate "Sign in with Okta" landing page
+        # (fleet-uniform direct redirect). /login kept for logout landing and
+        # auth-error display only.
+        return redirect(url_for("oidc_login", next=request.path))
 
 
 # ---------------------------------------------------------------------------
-# Auth Routes (Authlib + PROD Okta via "Okta Admin Tools" app)
+# Auth Routes (Authlib + PROD Okta via "Admin SSO App" app)
 # ---------------------------------------------------------------------------
 
 @app.route("/health")
@@ -189,6 +192,9 @@ def oidc_login():
     if not OIDC_ENABLED:
         session["login_error"] = "OIDC not configured"
         return redirect(url_for("login"))
+    next_url = request.args.get("next")
+    if next_url:
+        session["post_login_redirect"] = next_url
     redirect_uri = url_for("oidc_callback", _external=True)
     return oauth.okta.authorize_redirect(redirect_uri)
 
@@ -281,6 +287,28 @@ def parse():
             parsed.append({"filename": url_input, "error": f"Security Block: {ve}"})
         except Exception as e:
             parsed.append({"filename": url_input, "error": f"URL Error: {e}"})
+
+    # --- Handle raw XML paste ---
+    raw_input = request.form.get("metadata_raw", "").strip()
+    if raw_input:
+        try:
+            info = parse_file_bytes("pasted-xml", raw_input.encode("utf-8"))
+            parsed.append({
+                "filename": "pasted-xml",
+                "entity_id": info["entity_id"],
+                "role": info["role"],
+                "authn_requests_signed": info["authn_requests_signed"],
+                "want_assertions_signed": info["want_assertions_signed"],
+                "nameid_formats": info["nameid_formats"],
+                "acs_endpoints": info["acs_endpoints"],
+                "single_sign_on": info["single_sign_on"],
+                "certs_signing": info["certs_signing"],
+                "certs_encryption": info["certs_encryption"],
+                "certs_signing_details": info["certs_signing_details"],
+                "certs_encryption_details": info["certs_encryption_details"],
+            })
+        except Exception as e:
+            parsed.append({"filename": "pasted-xml", "error": f"Parse error: {e}"})
 
     # --- Handle file uploads ---
     for f in request.files.getlist("metadata_files"):
