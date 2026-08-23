@@ -4,8 +4,8 @@
 #
 # Prerequisites:
 #   - az login (service principal): see MEMORY.md for the organization SP re-login command
-#   - Azure AD App Registration created (see AZURE_AD_SETUP.md)
-#   - Secrets ready: FLASK_SECRET_KEY, AZURE_OIDC_CLIENT_ID, AZURE_OIDC_CLIENT_SECRET, AZURE_OIDC_TENANT_ID
+#   - A dedicated Okta OIDC client for this tool (redirect URI: <app-url>/oidc/callback)
+#   - Secrets ready: FLASK_SECRET_KEY, OIDC_ISSUER, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET
 
 set -e
 
@@ -33,11 +33,11 @@ echo "Enter secrets for the Container App (input is hidden):"
 echo ""
 
 read -rsp "FLASK_SECRET_KEY: " FLASK_SECRET_KEY; echo
-read -rsp "AZURE_OIDC_CLIENT_ID: " AZURE_CLIENT_ID; echo
-read -rsp "AZURE_OIDC_CLIENT_SECRET: " AZURE_CLIENT_SECRET; echo
-read -rsp "AZURE_OIDC_TENANT_ID: " AZURE_TENANT_ID; echo
+read -rp  "OIDC_ISSUER (e.g. https://your-org.okta.com): " OIDC_ISSUER
+read -rsp "OIDC_CLIENT_ID: " OIDC_CLIENT_ID; echo
+read -rsp "OIDC_CLIENT_SECRET: " OIDC_CLIENT_SECRET; echo
 
-if [ -z "$FLASK_SECRET_KEY" ] || [ -z "$AZURE_CLIENT_ID" ] || [ -z "$AZURE_CLIENT_SECRET" ] || [ -z "$AZURE_TENANT_ID" ]; then
+if [ -z "$FLASK_SECRET_KEY" ] || [ -z "$OIDC_ISSUER" ] || [ -z "$OIDC_CLIENT_ID" ] || [ -z "$OIDC_CLIENT_SECRET" ]; then
   echo "ERROR: All secrets are required. Aborting."
   exit 1
 fi
@@ -66,14 +66,14 @@ az containerapp create \
   --registry-server "${ACR}.azurecr.io" \
   --secrets \
     flask-secret-key="$FLASK_SECRET_KEY" \
-    azure-oidc-client-id="$AZURE_CLIENT_ID" \
-    azure-oidc-client-secret="$AZURE_CLIENT_SECRET" \
-    azure-oidc-tenant-id="$AZURE_TENANT_ID" \
+    oidc-issuer="$OIDC_ISSUER" \
+    oidc-client-id="$OIDC_CLIENT_ID" \
+    oidc-client-secret="$OIDC_CLIENT_SECRET" \
   --env-vars \
     FLASK_SECRET_KEY=secretref:flask-secret-key \
-    AZURE_OIDC_CLIENT_ID=secretref:azure-oidc-client-id \
-    AZURE_OIDC_CLIENT_SECRET=secretref:azure-oidc-client-secret \
-    AZURE_OIDC_TENANT_ID=secretref:azure-oidc-tenant-id
+    OIDC_ISSUER=secretref:oidc-issuer \
+    OIDC_CLIENT_ID=secretref:oidc-client-id \
+    OIDC_CLIENT_SECRET=secretref:oidc-client-secret
 
 # --- Get the app URL ---
 echo ""

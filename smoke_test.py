@@ -130,7 +130,7 @@ except Exception as e:
 # ---------------------------------------------------------------------------
 section("Documentation Files")
 
-required_docs = ["AGENTS.md", "SESSION_NOTES.md", "requirements.txt", "Dockerfile", "deploy.sh"]
+required_docs = ["README.md", "HOWTO.md", "requirements.txt", "Dockerfile"]
 for doc in required_docs:
     if os.path.exists(doc):
         ok(f"{doc} exists")

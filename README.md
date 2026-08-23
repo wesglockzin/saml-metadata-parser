@@ -22,12 +22,14 @@ values are not.
 
 ## What it does
 
-- **Two inputs:** upload a metadata `.xml`, or give it a URL to fetch.
+- **Three inputs:** upload metadata `.xml` files, paste raw XML, or give it a
+  URL to fetch.
 - **Extracts:** `entityID`, role (IdP / SP), SingleSignOnService and
   AssertionConsumerService endpoints with bindings, and every
   `KeyDescriptor` certificate (signing / encryption).
 - **Decodes each certificate:** subject, issuer, serial, validity window,
-  SHA-1 and SHA-256 fingerprints, key algorithm — and flags expired certs.
+  SHA-1 and SHA-256 fingerprints, key algorithm. Validity dates are shown;
+  expired certs are not visually flagged yet.
 - **Download any certificate as PEM** straight from the results page.
 - **Stateless:** no database; results live in the signed session cookie for
   the life of the page.
