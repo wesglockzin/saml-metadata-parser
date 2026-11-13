@@ -38,6 +38,24 @@ def test_allowed_group_signs_in(monkeypatch):
         assert "user" in sess
 
 
+def test_groups_scope_is_requested_by_default():
+    app = create_app(OIDC_ENV)
+    oauth = app.extensions["authlib.integrations.flask_client"]
+    assert "groups" in oauth.oidc.client_kwargs["scope"].split()
+
+
+def test_scopes_can_be_overridden():
+    app = create_app({**OIDC_ENV, "OIDC_SCOPES": "openid email"})
+    oauth = app.extensions["authlib.integrations.flask_client"]
+    assert oauth.oidc.client_kwargs["scope"] == "openid email"
+
+
+def test_string_groups_claim_not_on_list_is_refused(monkeypatch):
+    client, _ = _sign_in(monkeypatch, {"email": "eve@example.invalid", "groups": "other"})
+    with client.session_transaction() as sess:
+        assert "user" not in sess
+
+
 def test_user_not_on_allow_list_is_refused(monkeypatch):
     client, resp = _sign_in(monkeypatch, {"email": "eve@example.invalid", "groups": ["other"]})
     assert resp.headers["Location"].endswith("/login")

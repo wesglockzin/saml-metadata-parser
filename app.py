@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 PUBLIC_PATHS = {"/health", "/login", "/oidc/login", "/oidc/callback", "/logout", "/favicon.ico"}
 MAX_REDIRECTS = 5
-OIDC_SCOPES = "openid email profile"
+DEFAULT_OIDC_SCOPES = "openid email profile groups"
 
 
 class ConfigError(RuntimeError):
@@ -86,6 +86,7 @@ def load_settings(env=None):
             "FORCE_HTTPS",
             env.get("FORCE_HTTPS", "").strip() or ("true" if auth_mode == "oidc" else "false"),
         ),
+        "oidc_scopes": env.get("OIDC_SCOPES", "").strip() or DEFAULT_OIDC_SCOPES,
         "allowed_emails": _csv(env, "ALLOWED_EMAILS", lower=True),
         "allowed_groups": _csv(env, "ALLOWED_GROUPS"),
         "verify_ssl": _flag(env, "VERIFY_SSL", "true"),
@@ -224,7 +225,7 @@ def create_app(env=None, *, fetch=None):
             client_id=settings["oidc_client_id"],
             client_secret=settings["oidc_client_secret"],
             server_metadata_url=f"{settings['oidc_issuer']}/.well-known/openid-configuration",
-            client_kwargs={"scope": OIDC_SCOPES, "code_challenge_method": "S256"},
+            client_kwargs={"scope": settings["oidc_scopes"], "code_challenge_method": "S256"},
         )
     else:
         logger.warning("AUTH_MODE=none: sign-in is disabled and the app is open")
