@@ -67,7 +67,9 @@ def load_settings(env=None):
             ("OIDC_CLIENT_SECRET", "oidc_client_secret"),
         ):
             if not settings[key]:
-                raise ConfigError(f"{var} is required (or set AUTH_MODE=none to run without sign-in)")
+                raise ConfigError(
+                    f"{var} is required (or set AUTH_MODE=none to run without sign-in)"
+                )
     elif not settings["secret_key"]:
         logger.warning("FLASK_SECRET_KEY unset: using a per-process key; run a single worker")
         settings["secret_key"] = os.urandom(32).hex()
@@ -111,7 +113,9 @@ def safe_next(target):
     return target
 
 
-def fetch_metadata(url, *, timeout, verify, max_bytes, validate=validate_safe_url, get=requests.get):
+def fetch_metadata(
+    url, *, timeout, verify, max_bytes, validate=validate_safe_url, get=requests.get
+):
     """Fetch url, re-validating every redirect hop and capping the body size."""
     for _ in range(MAX_REDIRECTS + 1):
         validate(url)

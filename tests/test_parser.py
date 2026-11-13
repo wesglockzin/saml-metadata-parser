@@ -52,7 +52,9 @@ def test_idp_metadata_is_parsed():
 
 
 def test_bare_ampersand_in_location_is_tolerated():
-    info = parse_file_bytes("x", idp_xml(make_cert_b64(), "https://idp.example.invalid/sso?a=1&b=2"))
+    info = parse_file_bytes(
+        "x", idp_xml(make_cert_b64(), "https://idp.example.invalid/sso?a=1&b=2")
+    )
     assert info["single_sign_on"][0]["location"].endswith("?a=1&b=2")
 
 

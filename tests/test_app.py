@@ -73,7 +73,9 @@ def test_gate_redirects_anonymous_user():
     assert "/oidc/login" in resp.headers["Location"]
 
 
-@pytest.mark.parametrize("target", ["//evil.example.invalid", "https://evil.example.invalid", "/\\evil", ""])
+@pytest.mark.parametrize(
+    "target", ["//evil.example.invalid", "https://evil.example.invalid", "/\\evil", ""]
+)
 def test_unsafe_next_rejected(target):
     assert safe_next(target) is None
 
@@ -111,7 +113,14 @@ def test_fetch_rechecks_redirect_target():
         return FakeResponse(302, location="http://internal.example.invalid/x")
 
     with pytest.raises(UnsafeURLError):
-        fetch_metadata("https://ok.example.invalid/m", timeout=1, verify=True, max_bytes=100, validate=validate, get=get)
+        fetch_metadata(
+            "https://ok.example.invalid/m",
+            timeout=1,
+            verify=True,
+            max_bytes=100,
+            validate=validate,
+            get=get,
+        )
     assert seen == ["https://ok.example.invalid/m", "http://internal.example.invalid/x"]
 
 
@@ -122,7 +131,14 @@ def test_fetch_never_disables_tls_or_follows_redirects_itself():
         calls.append(kwargs)
         return FakeResponse(200, b"<a/>")
 
-    body = fetch_metadata("https://ok.example.invalid/m", timeout=1, verify=True, max_bytes=100, validate=lambda u: None, get=get)
+    body = fetch_metadata(
+        "https://ok.example.invalid/m",
+        timeout=1,
+        verify=True,
+        max_bytes=100,
+        validate=lambda u: None,
+        get=get,
+    )
     assert body == b"<a/>"
     assert calls[0]["verify"] is True
     assert calls[0]["allow_redirects"] is False
@@ -133,7 +149,14 @@ def test_fetch_size_cap():
         return FakeResponse(200, b"x" * 50)
 
     with pytest.raises(UnsafeURLError, match="too large"):
-        fetch_metadata("https://ok.example.invalid/m", timeout=1, verify=True, max_bytes=10, validate=lambda u: None, get=get)
+        fetch_metadata(
+            "https://ok.example.invalid/m",
+            timeout=1,
+            verify=True,
+            max_bytes=10,
+            validate=lambda u: None,
+            get=get,
+        )
 
 
 def test_redirect_loop_stops():
@@ -141,7 +164,14 @@ def test_redirect_loop_stops():
         return FakeResponse(302, location="https://ok.example.invalid/again")
 
     with pytest.raises(UnsafeURLError, match="redirects"):
-        fetch_metadata("https://ok.example.invalid/m", timeout=1, verify=True, max_bytes=10, validate=lambda u: None, get=get)
+        fetch_metadata(
+            "https://ok.example.invalid/m",
+            timeout=1,
+            verify=True,
+            max_bytes=10,
+            validate=lambda u: None,
+            get=get,
+        )
 
 
 def test_validate_blocks_loopback_and_bad_scheme():
@@ -153,7 +183,9 @@ def test_validate_blocks_loopback_and_bad_scheme():
 
 def test_http_error_is_reported_as_http_error():
     def fetch(url, **kwargs):
-        return fetch_metadata(url, validate=lambda u: None, get=lambda u, **kw: FakeResponse(404, b"gone"), **kwargs)
+        return fetch_metadata(
+            url, validate=lambda u: None, get=lambda u, **kw: FakeResponse(404, b"gone"), **kwargs
+        )
 
     client = create_app({"AUTH_MODE": "none"}, fetch=fetch).test_client()
     resp = client.post("/parse", data={"metadata_url": "https://ok.example.invalid/m"})

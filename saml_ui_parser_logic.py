@@ -3,25 +3,26 @@ import base64
 import logging
 import re
 
-from lxml import etree
 from cryptography import x509
 from cryptography.exceptions import UnsupportedAlgorithm
-from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+from lxml import etree
 
 logger = logging.getLogger(__name__)
 
 # Matches a bare & not already part of a valid XML entity reference
-_BARE_AMP_RE = re.compile(rb'&(?!(?:[a-zA-Z][a-zA-Z0-9]*|#[0-9]+|#x[0-9a-fA-F]+);)')
+_BARE_AMP_RE = re.compile(rb"&(?!(?:[a-zA-Z][a-zA-Z0-9]*|#[0-9]+|#x[0-9a-fA-F]+);)")
 
 NAMESPACES = {
     "md": "urn:oasis:names:tc:SAML:2.0:metadata",
-    "ds": "http://www.w3.org/2000/09/xmldsig#"
+    "ds": "http://www.w3.org/2000/09/xmldsig#",
 }
 
 # Clark-notation URIs for namespace-prefix-agnostic lookups
-_NS_MD   = "urn:oasis:names:tc:SAML:2.0:metadata"
-_NS_DS   = "http://www.w3.org/2000/09/xmldsig#"
+_NS_MD = "urn:oasis:names:tc:SAML:2.0:metadata"
+_NS_DS = "http://www.w3.org/2000/09/xmldsig#"
+
 
 def load_xml_bytes(b):
     try:
@@ -29,18 +30,21 @@ def load_xml_bytes(b):
     except etree.XMLSyntaxError:
         # Retry after escaping bare & characters — common in metadata URLs
         # (e.g. Location="https://sp.example.com/acs?foo=bar&binding=post")
-        sanitized = _BARE_AMP_RE.sub(b'&amp;', b)
+        sanitized = _BARE_AMP_RE.sub(b"&amp;", b)
         return etree.fromstring(sanitized)
+
 
 def to_pem(b64_der):
     der = base64.b64decode(b64_der.encode("ascii"))
     lines = base64.encodebytes(der).decode("ascii").replace("\n", "")
-    chunks = [lines[i:i+64] for i in range(0, len(lines), 64)]
+    chunks = [lines[i : i + 64] for i in range(0, len(lines), 64)]
     return "-----BEGIN CERTIFICATE-----\n" + "\n".join(chunks) + "\n-----END CERTIFICATE-----\n"
+
 
 def hex_bytes(b):
     h = b.hex().upper()
-    return " ".join(h[i:i+2] for i in range(0, len(h), 2))
+    return " ".join(h[i : i + 2] for i in range(0, len(h), 2))
+
 
 def block_hex(b, width=32):
     h = hex_bytes(b).split(" ")
@@ -55,12 +59,14 @@ def block_hex(b, width=32):
         lines.append(" ".join(row))
     return "\n".join(lines)
 
+
 def get_attr_value(name, rdn_seq):
     for r in rdn_seq:
         for a in r:
             if a.oid.dotted_string == name:
                 return a.value
     return None
+
 
 def parse_cert_details(pem):
     cert = x509.load_pem_x509_certificate(pem.encode("utf-8"))
@@ -93,7 +99,9 @@ def parse_cert_details(pem):
     spki_sha1 = hashes.Hash(hashes.SHA1())
     spki_sha1.update(spki)
     spki_fp = spki_sha1.finalize()
-    sig_algo_oid = cert.signature_algorithm_oid.dotted_string if cert.signature_algorithm_oid else ""
+    sig_algo_oid = (
+        cert.signature_algorithm_oid.dotted_string if cert.signature_algorithm_oid else ""
+    )
     signature = cert.signature
     details = {
         "subject": subj,
@@ -104,20 +112,18 @@ def parse_cert_details(pem):
         "fingerprints": {
             "sha1": hex_bytes(sha1),
             "sha256": hex_bytes(sha256),
-            "md5": hex_bytes(md5)
+            "md5": hex_bytes(md5),
         },
         "public_key": {
             "algorithm": key_algo,
             "size": key_size,
             "spki_sha1": hex_bytes(spki_fp),
-            "spki_hex": block_hex(spki)
+            "spki_hex": block_hex(spki),
         },
-        "signature": {
-            "algorithm_oid": sig_algo_oid,
-            "hex": block_hex(signature)
-        }
+        "signature": {"algorithm_oid": sig_algo_oid, "hex": block_hex(signature)},
     }
     return details
+
 
 def _find_cert_text(kd):
     """
@@ -125,9 +131,9 @@ def _find_cert_text(kd):
     xmldsig namespace is declared — ds: prefix, bare xmlns default, or any
     other prefix. Uses Clark-notation URI matching so prefix doesn't matter.
     """
-    ki_tag  = f"{{{_NS_DS}}}KeyInfo"
-    x9_tag  = f"{{{_NS_DS}}}X509Data"
-    xc_tag  = f"{{{_NS_DS}}}X509Certificate"
+    ki_tag = f"{{{_NS_DS}}}KeyInfo"
+    x9_tag = f"{{{_NS_DS}}}X509Data"
+    xc_tag = f"{{{_NS_DS}}}X509Certificate"
 
     # Walk the KeyDescriptor subtree looking for the certificate element.
     # lxml always resolves Clark notation regardless of the prefix used in
@@ -156,24 +162,25 @@ def parse_metadata(xml_root):
     acs = []
     for sp in xml_root.findall("md:SPSSODescriptor", namespaces=NAMESPACES):
         for a in sp.findall("md:AssertionConsumerService", namespaces=NAMESPACES):
-            acs.append({
-                "index": a.get("index"),
-                "isDefault": a.get("isDefault"),
-                "binding": a.get("Binding"),
-                "location": a.get("Location")
-            })
+            acs.append(
+                {
+                    "index": a.get("index"),
+                    "isDefault": a.get("isDefault"),
+                    "binding": a.get("Binding"),
+                    "location": a.get("Location"),
+                }
+            )
     singlesignon = []
     for idp in xml_root.findall("md:IDPSSODescriptor", namespaces=NAMESPACES):
         for sso in idp.findall("md:SingleSignOnService", namespaces=NAMESPACES):
-            singlesignon.append({
-                "binding": sso.get("Binding"),
-                "location": sso.get("Location")
-            })
+            singlesignon.append({"binding": sso.get("Binding"), "location": sso.get("Location")})
     certs_signing = []
     certs_encryption = []
     certs_signing_details = []
     certs_encryption_details = []
-    roles = xml_root.findall(".//md:IDPSSODescriptor", namespaces=NAMESPACES) + xml_root.findall(".//md:SPSSODescriptor", namespaces=NAMESPACES)
+    roles = xml_root.findall(".//md:IDPSSODescriptor", namespaces=NAMESPACES) + xml_root.findall(
+        ".//md:SPSSODescriptor", namespaces=NAMESPACES
+    )
     for kd_parent in roles:
         for kd in kd_parent.findall("md:KeyDescriptor", namespaces=NAMESPACES):
             use = kd.get("use") or "unspecified"
@@ -204,12 +211,17 @@ def parse_metadata(xml_root):
         "certs_signing": certs_signing,
         "certs_encryption": certs_encryption,
         "certs_signing_details": certs_signing_details,
-        "certs_encryption_details": certs_encryption_details
+        "certs_encryption_details": certs_encryption_details,
     }
+
 
 def parse_file_bytes(filename, data):
     root = load_xml_bytes(data)
     return parse_metadata(root)
 
+
 def sanitize_filename(name):
-    return "".join(c for c in (name or "") if c.isalnum() or c in ("-", "_", ".", " ")).strip() or "metadata"
+    return (
+        "".join(c for c in (name or "") if c.isalnum() or c in ("-", "_", ".", " ")).strip()
+        or "metadata"
+    )

@@ -3,13 +3,13 @@
 One function: register_howto(app, *, tool_name). Mounts a /howto route on
 the Flask app that renders HOWTO.md (next to app.py) as a styled HTML page.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
 
 import markdown
 from flask import Flask, render_template_string
-
 
 _PAGE_TEMPLATE = """\
 <!DOCTYPE html>
@@ -117,6 +117,7 @@ def register_howto(app: Flask, *, tool_name: str, howto_filename: str = "HOWTO.m
     before_request runs an OIDC enforcer that covers all routes, /howto
     is covered automatically.
     """
+
     @app.route("/howto")
     def howto():
         howto_path = Path(app.root_path) / howto_filename
