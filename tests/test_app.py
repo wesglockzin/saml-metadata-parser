@@ -24,7 +24,7 @@ class FakeResponse:
         if self.status_code >= 400:
             resp = requests.Response()
             resp.status_code = self.status_code
-            resp._content = self._body
+            # Like a streamed response that was never read: no content available.
             raise requests.HTTPError("failed", response=resp)
 
     def iter_content(self, size):
@@ -226,6 +226,47 @@ def test_http_error_is_reported_as_http_error():
     text = resp.get_data(as_text=True)
     assert "HTTP error: the server answered 404" in text
     assert "Could not reach" not in text
+
+
+def test_http_error_body_is_logged(caplog):
+    with caplog.at_level("WARNING"), pytest.raises(requests.HTTPError):
+        fetch_metadata(
+            "https://ok.example.invalid/m",
+            timeout=1,
+            verify=True,
+            max_bytes=100,
+            validate=lambda u: None,
+            get=lambda u, **kw: FakeResponse(503, b"maintenance window"),
+        )
+    assert "503" in caplog.text
+    assert "maintenance window" in caplog.text
+
+
+def test_empty_number_setting_uses_default():
+    settings = app_module.load_settings({"AUTH_MODE": "none", "HTTP_TIMEOUT": ""})
+    assert settings["http_timeout"] == 10
+
+
+@pytest.mark.parametrize("ip", ["100.64.0.1", "10.0.0.1", "169.254.169.254"])
+def test_validate_blocks_non_global_addresses(ip):
+    with pytest.raises(UnsafeURLError):
+        app_module.validate_safe_url(f"http://{ip}/")
+
+
+def test_compose_passes_every_documented_setting():
+    import pathlib
+    import re
+
+    root = pathlib.Path(__file__).resolve().parent.parent
+    names = re.findall(r"^([A-Z_]+)=", (root / ".env.example").read_text(), re.M)
+    compose = (root / "docker-compose.yml").read_text()
+    # HOST is for local runs only; the container always binds all interfaces.
+    missing = [n for n in names if n != "HOST" and f"{n}:" not in compose]
+    assert missing == []
+
+
+def test_control_character_next_rejected():
+    assert safe_next("/\t/evil.example.invalid") is None
 
 
 def test_fetch_uses_verify_setting():

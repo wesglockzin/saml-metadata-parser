@@ -45,7 +45,7 @@ def _flag(env, name, default):
 
 def _number(env, name, default, kind):
     try:
-        value = kind(env.get(name, default))
+        value = kind(env.get(name, "").strip() or default)
     except ValueError as exc:
         raise ConfigError(f"{name} must be a number") from exc
     if not value > 0:
@@ -115,7 +115,7 @@ def validate_safe_url(url):
         raise UnsafeURLError(f"Could not resolve hostname: {hostname}") from exc
     for info in addr_info:
         ip = ipaddress.ip_address(info[4][0])
-        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
+        if not ip.is_global or ip.is_multicast:
             raise UnsafeURLError(f"Blocked internal/private IP address: {ip}")
 
 
@@ -124,7 +124,7 @@ def safe_next(target):
     if not target or not target.startswith("/") or target.startswith(("//", "/\\")):
         return None
     parsed = urlparse(target)
-    if parsed.scheme or parsed.netloc or "\\" in target or "\n" in target or "\r" in target:
+    if parsed.scheme or parsed.netloc or "\\" in target or any(ord(c) < 0x20 for c in target):
         return None
     return target
 
@@ -140,6 +140,13 @@ def fetch_metadata(
             if resp.is_redirect and resp.headers.get("Location"):
                 url = urljoin(url, resp.headers["Location"])
                 continue
+            if resp.status_code >= 400:
+                snippet = next(iter(resp.iter_content(512)), b"")
+                logger.warning(
+                    "HTTP %s from metadata server: %s",
+                    resp.status_code,
+                    snippet.decode("utf-8", "replace"),
+                )
             resp.raise_for_status()
             body = b""
             for chunk in resp.iter_content(65536):
@@ -304,8 +311,7 @@ def create_app(env=None, *, fetch=None):
             return _result_entry(name, parse_file_bytes(name, loader()))
         except requests.HTTPError as exc:
             status = exc.response.status_code if exc.response is not None else "unknown"
-            body = exc.response.text[:500] if exc.response is not None else ""
-            logger.warning("Fetch of %r failed with HTTP %s: %s", name, status, body)
+            logger.warning("Fetch of %r failed with HTTP %s", name, status)
             return {"filename": name, "error": f"HTTP error: the server answered {status}"}
         except requests.RequestException:
             logger.warning("Fetch of %r failed", name, exc_info=True)
