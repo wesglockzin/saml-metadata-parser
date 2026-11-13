@@ -26,10 +26,35 @@ def _sign_in(monkeypatch, userinfo):
 
 
 def test_allowed_email_signs_in(monkeypatch):
-    client, resp = _sign_in(monkeypatch, {"email": "alice@example.invalid"})
+    client, resp = _sign_in(
+        monkeypatch, {"email": "alice@example.invalid", "email_verified": True}
+    )
     assert resp.status_code == 302
     with client.session_transaction() as sess:
         assert sess["user"]["email"] == "alice@example.invalid"
+
+
+def test_unverified_email_is_refused(monkeypatch):
+    client, _ = _sign_in(
+        monkeypatch, {"email": "alice@example.invalid", "email_verified": False}
+    )
+    with client.session_transaction() as sess:
+        assert "user" not in sess
+
+
+def test_missing_email_verified_is_refused(monkeypatch):
+    client, _ = _sign_in(monkeypatch, {"email": "alice@example.invalid"})
+    with client.session_transaction() as sess:
+        assert "user" not in sess
+
+
+def test_preferred_username_is_not_matched_to_email_list(monkeypatch):
+    client, _ = _sign_in(
+        monkeypatch,
+        {"preferred_username": "alice@example.invalid", "email_verified": True},
+    )
+    with client.session_transaction() as sess:
+        assert "user" not in sess
 
 
 def test_allowed_group_signs_in(monkeypatch):
@@ -38,10 +63,26 @@ def test_allowed_group_signs_in(monkeypatch):
         assert "user" in sess
 
 
-def test_groups_scope_is_requested_by_default():
-    app = create_app(OIDC_ENV)
-    oauth = app.extensions["authlib.integrations.flask_client"]
+def test_string_groups_claim_on_list_signs_in(monkeypatch):
+    client, _ = _sign_in(monkeypatch, {"email": "x@example.invalid", "groups": "metadata-users"})
+    with client.session_transaction() as sess:
+        assert "user" in sess
+
+
+def test_non_list_groups_claim_is_refused_not_an_error(monkeypatch):
+    client, resp = _sign_in(monkeypatch, {"email": "x@example.invalid", "groups": 5})
+    assert resp.status_code == 302
+    with client.session_transaction() as sess:
+        assert "user" not in sess
+
+
+def test_groups_scope_requested_only_with_group_allow_list():
+    oauth = create_app(OIDC_ENV).extensions["authlib.integrations.flask_client"]
     assert "groups" in oauth.oidc.client_kwargs["scope"].split()
+    env = {**OIDC_ENV}
+    del env["ALLOWED_GROUPS"]
+    oauth = create_app(env).extensions["authlib.integrations.flask_client"]
+    assert oauth.oidc.client_kwargs["scope"] == "openid email profile"
 
 
 def test_scopes_can_be_overridden():

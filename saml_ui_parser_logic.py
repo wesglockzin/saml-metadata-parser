@@ -152,7 +152,9 @@ def parse_metadata(xml_root):
     spsso = xml_root.find("md:SPSSODescriptor", namespaces=NAMESPACES)
     role = "IdP" if idpsso is not None else ("SP" if spsso is not None else "Unknown")
     node = idpsso if idpsso is not None else spsso
-    authn_signed = node.get("AuthnRequestsSigned") if node is not None else None
+    # An IdP says WantAuthnRequestsSigned; an SP says AuthnRequestsSigned.
+    authn_attr = "WantAuthnRequestsSigned" if idpsso is not None else "AuthnRequestsSigned"
+    authn_signed = node.get(authn_attr) if node is not None else None
     want_assert_signed = node.get("WantAssertionsSigned") if node is not None else None
     nameid = []
     if node is not None:

@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 PUBLIC_PATHS = {"/health", "/login", "/oidc/login", "/oidc/callback", "/logout", "/favicon.ico"}
 MAX_REDIRECTS = 5
-DEFAULT_OIDC_SCOPES = "openid email profile groups"
+DEFAULT_OIDC_SCOPES = "openid email profile"
 
 
 class ConfigError(RuntimeError):
@@ -59,13 +59,16 @@ def _csv(env, name, lower=False):
 
 
 def is_allowed(settings, email, claims):
-    """True if the email or one of the group claims is on the allow-list."""
-    if email.lower() in settings["allowed_emails"]:
+    """True if a verified email or one of the group claims is on the allow-list."""
+    verified = claims.get("email_verified") in (True, "true")
+    if email and verified and email.lower() in settings["allowed_emails"]:
         return True
     groups = claims.get("groups") or []
     if isinstance(groups, str):
         groups = [groups]
-    return any(g in settings["allowed_groups"] for g in groups)
+    if not isinstance(groups, (list, tuple)):
+        return False
+    return any(g in settings["allowed_groups"] for g in groups if isinstance(g, str))
 
 
 def load_settings(env=None):
@@ -86,13 +89,18 @@ def load_settings(env=None):
             "FORCE_HTTPS",
             env.get("FORCE_HTTPS", "").strip() or ("true" if auth_mode == "oidc" else "false"),
         ),
-        "oidc_scopes": env.get("OIDC_SCOPES", "").strip() or DEFAULT_OIDC_SCOPES,
         "allowed_emails": _csv(env, "ALLOWED_EMAILS", lower=True),
         "allowed_groups": _csv(env, "ALLOWED_GROUPS"),
         "verify_ssl": _flag(env, "VERIFY_SSL", "true"),
+        "oidc_scopes": env.get("OIDC_SCOPES", "").strip(),
         "http_timeout": _number(env, "HTTP_TIMEOUT", "10", float),
         "max_bytes": _number(env, "MAX_CONTENT_BYTES", str(5 * 1024 * 1024), int),
     }
+    if not settings["oidc_scopes"]:
+        # Ask for "groups" only when a group allow-list needs it; some providers reject it.
+        settings["oidc_scopes"] = DEFAULT_OIDC_SCOPES + (
+            " groups" if settings["allowed_groups"] else ""
+        )
     if auth_mode == "oidc":
         for var, key in (
             ("FLASK_SECRET_KEY", "secret_key"),
@@ -297,16 +305,18 @@ def create_app(env=None, *, fetch=None):
             session["login_error"] = "Sign-in failed. Try again."
             return redirect(url_for("login"))
         claims = token.get("userinfo") or {}
-        email = claims.get("email") or claims.get("preferred_username")
-        if not email:
+        email = claims.get("email")
+        # preferred_username is only a display fallback; it is never matched to the email list.
+        who = email or claims.get("preferred_username")
+        if not who:
             session["login_error"] = "No email claim was returned by the identity provider."
             return redirect(url_for("login"))
-        if not is_allowed(settings, str(email), claims):
+        if not is_allowed(settings, str(email or ""), claims):
             logger.warning("Sign-in refused: user is not on the allow-list")
             session["login_error"] = "Your account is not allowed to use this app."
             return redirect(url_for("login"))
         session["user"] = {
-            "email": email,
+            "email": who,
             "name": claims.get("name"),
             "login_time": datetime.now(timezone.utc).isoformat(),
         }

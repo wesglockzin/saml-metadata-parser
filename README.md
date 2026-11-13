@@ -36,8 +36,8 @@ See `.env.example`.
 | `AUTH_MODE` | `oidc` | `oidc`, or `none` to run open (local use only) |
 | `FLASK_SECRET_KEY` | none | Session signing key. Required with `oidc` |
 | `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | none | OpenID Connect client. Required with `oidc` |
-| `ALLOWED_EMAILS`, `ALLOWED_GROUPS` | none | Comma-separated allow-list: the email claim or the `groups` claim must match. At least one is required with `oidc` |
-| `OIDC_SCOPES` | `openid email profile groups` | Scopes requested at sign-in. For `ALLOWED_GROUPS` the provider must emit a `groups` claim. If there is no `email` claim, `preferred_username` is matched against `ALLOWED_EMAILS` |
+| `ALLOWED_EMAILS`, `ALLOWED_GROUPS` | none | Comma-separated allow-list: a verified `email` claim (`email_verified` true, case-insensitive) or the `groups` claim (exact, case-sensitive; some providers send group IDs, not names) must match. `preferred_username` is never matched. At least one list is required with `oidc` |
+| `OIDC_SCOPES` | `openid email profile`, plus `groups` when `ALLOWED_GROUPS` is set | Scopes requested at sign-in. For `ALLOWED_GROUPS` the provider must emit a `groups` claim |
 | `FORCE_HTTPS` | `true` with `oidc`, `false` with `none` | Secure cookies and HSTS; set `false` only for plain-HTTP local testing |
 | `VERIFY_SSL` | `true` | TLS verification when fetching a metadata URL |
 | `HTTP_TIMEOUT` | `10` | Seconds to wait for a metadata URL |

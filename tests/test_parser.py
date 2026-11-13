@@ -51,6 +51,11 @@ def test_idp_metadata_is_parsed():
     assert details["public_key"]["algorithm"] == "RSA"
 
 
+def test_idp_want_authn_requests_signed_is_read():
+    info = parse_file_bytes("x", idp_xml(make_cert_b64()))
+    assert info["authn_requests_signed"] == "true"
+
+
 def test_bare_ampersand_in_location_is_tolerated():
     info = parse_file_bytes(
         "x", idp_xml(make_cert_b64(), "https://idp.example.invalid/sso?a=1&b=2")
