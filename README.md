@@ -1,126 +1,78 @@
-> **Paste a SAML metadata URL or upload the XML — get the entity ID, the
-> role, every SSO/ACS endpoint with its binding, and each X.509 certificate
-> decoded with fingerprints and validity dates. The thing I open before
-> every federation ticket.**
-
 # SAML Metadata Parser
 
-A small Flask tool for reading SAML 2.0 metadata without squinting at XML.
-Runs on Azure Container Apps behind an Okta OIDC sign-in.
+A small Flask web service for reading SAML 2.0 metadata. Paste a metadata URL,
+paste XML or upload files, and get the entity ID, the role (IdP or SP), every
+SSO and ACS endpoint with its binding, and each X.509 certificate decoded with
+fingerprints and validity dates. Any certificate can be downloaded as PEM.
 
----
+**Type:** service (web application).
 
-### About this repo
-
-This is a sanitized snapshot of an internal tool, published through an
-automated review-and-publish pipeline. Internal hostnames, tenant and
-resource names are replaced with placeholders (`host.example.gov`,
-`your-resource-group`). The code is the code that runs; the configuration
-values are not.
-
----
-
-## What it does
-
-- **Three inputs:** upload metadata `.xml` files, paste raw XML, or give it a
-  URL to fetch.
-- **Extracts:** `entityID`, role (IdP / SP), SingleSignOnService and
-  AssertionConsumerService endpoints with bindings, and every
-  `KeyDescriptor` certificate (signing / encryption).
-- **Decodes each certificate:** subject, issuer, serial, validity window,
-  SHA-1 and SHA-256 fingerprints, key algorithm. Validity dates are shown;
-  expired certs are not visually flagged yet.
-- **Download any certificate as PEM** straight from the results page.
-- **Stateless:** no database; results live in the signed session cookie for
-  the life of the page.
-
-## How it protects itself
-
-- **URL fetches are validated first** (`validate_safe_url`): the hostname is
-  resolved and refused if it lands on loopback, link-local (including
-  `169.254.169.254`), RFC 1918, or IPv6-local space.
-- **XML is parsed with lxml's default parser**, which does not resolve
-  external entities and caps entity expansion — verified with a `file://`
-  entity and a billion-laughs payload.
-- **Security headers** on every response (HSTS in production, CSP,
-  `X-Frame-Options`, `nosniff`).
-- **Sign-in gate:** Okta OIDC, authorization code + PKCE, `state`/`nonce`
-  validated by Authlib. Access is decided by assignment on the Okta app.
-
-## Project layout
-
-| File | Role |
-|---|---|
-| `app.py` | Flask app — auth gate, `/parse`, `/download_cert`, headers |
-| `saml_ui_parser_logic.py` | Metadata parsing and certificate decoding |
-| `index.html`, `login.html` | Templates |
-| `HOWTO.md` | In-app help, rendered at `/howto` |
-| `smoke_test.py` | Pre-deploy static checks |
-| `Dockerfile`, `setup-azure.sh` | Container image and one-time Azure Container Apps setup |
-
-## Routes
-
-| Route | Purpose |
-|---|---|
-| `/` | Form and results |
-| `/parse` `POST` | Parse an uploaded file or a fetched URL |
-| `/download_cert` | Return one parsed certificate as PEM |
-| `/login`, `/oidc/login`, `/oidc/callback`, `/logout` | The tool's sign-in gate |
-| `/howto` | In-app help |
-| `/health` | Liveness |
-
-## Configuration
-
-| Variable | Required | Purpose |
-|---|---|---|
-| `FLASK_SECRET_KEY` | yes | Session signing — must be identical across gunicorn workers |
-| `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | for the gate | The tool's own Okta OIDC client |
-| `APP_BASE_URL` | yes | Public base URL; drives the redirect URI and cookie flags |
-
-Locally these come from `env.config` (never committed — see
-`env.config.template`); in Azure Container Apps they are secrets injected as
-environment variables. **If the `OIDC_*` variables are unset the gate is
-disabled and the app serves open** — fine on a laptop, see *Known limitations*.
-
-## Running it
+## Run it
 
 ```bash
-pip install -r requirements.txt
-cp env.config.template env.config   # fill in values
-python app.py                       # http://localhost:8081
+cp .env.example .env     # fill in the sign-in settings first
+docker compose up
 ```
 
-Deployment is Azure Container Apps (gunicorn, 2 workers × 4 threads).
-`setup-azure.sh` creates the container app once; after that, images are built
-and promoted by the fleet's shared scripts — build → DEV, then a digest-gated
-DEV → PROD promotion — rather than by a per-tool deploy script.
+To try it without sign-in: `AUTH_MODE=none docker compose up`. Or, locally:
 
-## Known limitations
+```bash
+pip install -e .
+AUTH_MODE=none python app.py     # http://127.0.0.1:8081, no sign-in
+```
 
-Real, known, and in the order I intend to fix them.
+Sign-in is on by default and uses any OpenID Connect provider. The app refuses
+to start if `FLASK_SECRET_KEY`, `OIDC_ISSUER`, `OIDC_CLIENT_ID` or
+`OIDC_CLIENT_SECRET` is missing, or if neither `ALLOWED_EMAILS` nor
+`ALLOWED_GROUPS` is set, unless `AUTH_MODE=none` is set explicitly.
 
-- **Redirects are followed after validation.** `validate_safe_url` checks the
-  URL you typed, but the fetch follows HTTP redirects, so an allowed host that
-  302s to an internal address is not re-checked. The fetch also currently
-  disables TLS verification. Both are next.
-- **Gate fails open when unconfigured** (see *Configuration*). A fail-closed
-  startup check belongs in production deployments.
-- **Multi-certificate metadata can overflow the session cookie** (~4 KB),
-  which drops the results and the certificate download.
-- **`EntitiesDescriptor` wrappers** (aggregate / federation metadata) are not
-  unwrapped — only a top-level `EntityDescriptor` parses.
-- **CSP directives are missing separators** in the current header string, so
-  browsers don't apply the style/font/img directives as written.
-- No automated tests beyond `smoke_test.py`; no CI yet.
+## Settings
 
-## Version
+All settings are environment variables; a `.env` file is read for local runs.
+See `.env.example`.
 
-`APP_VERSION` in `app.py` is authoritative (currently 2.1.x).
+| Variable | Default | Purpose |
+|---|---|---|
+| `AUTH_MODE` | `oidc` | `oidc`, or `none` to run open (local use only) |
+| `FLASK_SECRET_KEY` | none | Session signing key. Required with `oidc` |
+| `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | none | OpenID Connect client. Required with `oidc` |
+| `ALLOWED_EMAILS`, `ALLOWED_GROUPS` | none | Comma-separated allow-list: a verified `email` claim (`email_verified` true, case-insensitive) or the `groups` claim (exact, case-sensitive; some providers send group IDs, not names) must match. `preferred_username` is never matched. At least one list is required with `oidc` |
+| `OIDC_SCOPES` | `openid email profile`, plus `groups` when `ALLOWED_GROUPS` is set | Scopes requested at sign-in. For `ALLOWED_GROUPS` the provider must emit a `groups` claim |
+| `FORCE_HTTPS` | `true` with `oidc`, `false` with `none` | Secure cookies and HSTS; set `false` only for plain-HTTP local testing |
+| `VERIFY_SSL` | `true` | TLS verification when fetching a metadata URL |
+| `HTTP_TIMEOUT` | `10` | Seconds to wait for a metadata URL |
+| `MAX_CONTENT_BYTES` | `5242880` | Largest upload or fetched document |
+| `HOST`, `PORT` | `127.0.0.1`, `8081` | Local run only. The container listens on `0.0.0.0:$PORT` |
+| `WEB_CONCURRENCY` | `1` | Container only: gunicorn workers |
+
+## Endpoints
+
+`/` form and results, `/parse` (POST), `/download_cert`, `/howto`, `/health`
+(no sign-in, calls nothing outside), and `/login`, `/oidc/login`,
+`/oidc/callback`, `/logout`.
+
+## Development
+
+```bash
+pip install -e ".[dev]"
+pytest
+ruff check . && ruff format --check .
+```
+
+Tests need no network and no identity provider.
+
+## Known limits
+
+- A metadata URL is checked before the fetch and again on every redirect, but
+  the name is resolved separately from the fetch, so DNS rebinding is not
+  fully closed.
+- Results live in the signed session cookie. Metadata with many certificates
+  can exceed the cookie size (about 4 KB) and drop the download.
+- `EntitiesDescriptor` wrappers (aggregate metadata) are not unwrapped.
+- The only POST (`/parse`) changes just the caller's own session cookie, which
+  is `SameSite=Lax`, so there is no separate CSRF token.
+- The page loads Pico CSS from a public CDN.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
-
-## Author
-
-Wes Glockzin
+MIT, see [LICENSE](LICENSE).
