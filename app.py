@@ -44,9 +44,12 @@ def _flag(env, name, default):
 
 def _number(env, name, default, kind):
     try:
-        return kind(env.get(name, default))
+        value = kind(env.get(name, default))
     except ValueError as exc:
         raise ConfigError(f"{name} must be a number") from exc
+    if not value > 0:
+        raise ConfigError(f"{name} must be greater than zero")
+    return value
 
 
 def load_settings(env=None):
@@ -61,7 +64,12 @@ def load_settings(env=None):
         "oidc_issuer": env.get("OIDC_ISSUER", "").rstrip("/"),
         "oidc_client_id": env.get("OIDC_CLIENT_ID", ""),
         "oidc_client_secret": env.get("OIDC_CLIENT_SECRET", ""),
-        "force_https": _flag(env, "FORCE_HTTPS", "false"),
+        # Secure cookies and HSTS default to on when sign-in is on; an empty value is unset.
+        "force_https": _flag(
+            env,
+            "FORCE_HTTPS",
+            env.get("FORCE_HTTPS", "").strip() or ("true" if auth_mode == "oidc" else "false"),
+        ),
         "verify_ssl": _flag(env, "VERIFY_SSL", "true"),
         "http_timeout": _number(env, "HTTP_TIMEOUT", "10", float),
         "max_bytes": _number(env, "MAX_CONTENT_BYTES", str(5 * 1024 * 1024), int),
@@ -102,7 +110,7 @@ def validate_safe_url(url):
         raise UnsafeURLError("Invalid URL format.")
     try:
         addr_info = socket.getaddrinfo(hostname, None)
-    except socket.gaierror as exc:
+    except (socket.gaierror, UnicodeError) as exc:
         raise UnsafeURLError(f"Could not resolve hostname: {hostname}") from exc
     for info in addr_info:
         ip = ipaddress.ip_address(info[4][0])
@@ -296,10 +304,10 @@ def create_app(env=None, *, fetch=None):
         except requests.HTTPError as exc:
             status = exc.response.status_code if exc.response is not None else "unknown"
             body = exc.response.text[:500] if exc.response is not None else ""
-            logger.warning("Fetch of %s failed with HTTP %s: %s", name, status, body)
+            logger.warning("Fetch of %r failed with HTTP %s: %s", name, status, body)
             return {"filename": name, "error": f"HTTP error: the server answered {status}"}
         except requests.RequestException:
-            logger.warning("Fetch of %s failed", name, exc_info=True)
+            logger.warning("Fetch of %r failed", name, exc_info=True)
             return {"filename": name, "error": "Could not reach the URL."}
         except UnsafeURLError as exc:
             return {"filename": name, "error": f"Security Block: {exc}"}

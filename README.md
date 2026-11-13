@@ -10,10 +10,11 @@ fingerprints and validity dates. Any certificate can be downloaded as PEM.
 ## Run it
 
 ```bash
+cp .env.example .env     # fill in the sign-in settings first
 docker compose up
 ```
 
-or, locally:
+To try it without sign-in: `AUTH_MODE=none docker compose up`. Or, locally:
 
 ```bash
 pip install -e .
@@ -34,7 +35,7 @@ See `.env.example`.
 | `AUTH_MODE` | `oidc` | `oidc`, or `none` to run open (local use only) |
 | `FLASK_SECRET_KEY` | none | Session signing key. Required with `oidc` |
 | `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | none | OpenID Connect client. Required with `oidc` |
-| `FORCE_HTTPS` | `false` | Secure cookies and HSTS; set `true` behind HTTPS |
+| `FORCE_HTTPS` | `true` with `oidc`, `false` with `none` | Secure cookies and HSTS; set `false` only for plain-HTTP local testing |
 | `VERIFY_SSL` | `true` | TLS verification when fetching a metadata URL |
 | `HTTP_TIMEOUT` | `10` | Seconds to wait for a metadata URL |
 | `MAX_CONTENT_BYTES` | `5242880` | Largest upload or fetched document |

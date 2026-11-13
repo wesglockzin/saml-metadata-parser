@@ -58,6 +58,34 @@ def test_bad_auth_mode_rejected():
         create_app({"AUTH_MODE": "off"})
 
 
+def test_oidc_mode_defaults_to_secure_cookies_and_hsts():
+    resp = create_app(OIDC_ENV).test_client().get("/health")
+    assert "Strict-Transport-Security" in resp.headers
+    assert create_app(OIDC_ENV).config["SESSION_COOKIE_SECURE"] is True
+    assert create_app({**OIDC_ENV, "FORCE_HTTPS": ""}).config["SESSION_COOKIE_SECURE"] is True
+
+
+def test_oidc_mode_https_can_be_turned_off_explicitly():
+    app = create_app({**OIDC_ENV, "FORCE_HTTPS": "false"})
+    assert app.config["SESSION_COOKIE_SECURE"] is False
+
+
+def test_none_mode_defaults_to_plain_http():
+    assert create_app({"AUTH_MODE": "none"}).config["SESSION_COOKIE_SECURE"] is False
+
+
+@pytest.mark.parametrize("name", ["HTTP_TIMEOUT", "MAX_CONTENT_BYTES"])
+@pytest.mark.parametrize("value", ["0", "-1"])
+def test_non_positive_setting_rejected(name, value):
+    with pytest.raises(ConfigError, match=name):
+        create_app({"AUTH_MODE": "none", name: value})
+
+
+def test_overlong_hostname_label_is_unsafe_url_not_crash():
+    with pytest.raises(UnsafeURLError):
+        app_module.validate_safe_url("http://" + "a" * 70 + ".example.invalid/")
+
+
 @pytest.mark.parametrize("name", ["HTTP_TIMEOUT", "MAX_CONTENT_BYTES"])
 def test_non_numeric_setting_names_the_setting(name):
     with pytest.raises(ConfigError, match=name):

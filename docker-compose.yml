@@ -10,5 +10,5 @@ services:
       OIDC_ISSUER: "${OIDC_ISSUER:-}"
       OIDC_CLIENT_ID: "${OIDC_CLIENT_ID:-}"
       OIDC_CLIENT_SECRET: "${OIDC_CLIENT_SECRET:-}"
-      FORCE_HTTPS: "${FORCE_HTTPS:-false}"
+      FORCE_HTTPS: "${FORCE_HTTPS:-}"
       VERIFY_SSL: "${VERIFY_SSL:-true}"
