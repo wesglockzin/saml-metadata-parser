@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 import base64
+import logging
 import re
+
 from lxml import etree
 from cryptography import x509
+from cryptography.exceptions import UnsupportedAlgorithm
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+
+logger = logging.getLogger(__name__)
 
 # Matches a bare & not already part of a valid XML entity reference
 _BARE_AMP_RE = re.compile(rb'&(?!(?:[a-zA-Z][a-zA-Z0-9]*|#[0-9]+|#x[0-9a-fA-F]+);)')
@@ -62,8 +67,12 @@ def parse_cert_details(pem):
     subj = cert.subject.rfc4514_string()
     iss = cert.issuer.rfc4514_string()
     serial = format(cert.serial_number, "X")
-    not_before = cert.not_valid_before.isoformat()
-    not_after = cert.not_valid_after.isoformat()
+    if hasattr(cert, "not_valid_before_utc"):
+        not_before = cert.not_valid_before_utc.replace(tzinfo=None).isoformat()
+        not_after = cert.not_valid_after_utc.replace(tzinfo=None).isoformat()
+    else:  # cryptography < 42
+        not_before = cert.not_valid_before.isoformat()
+        not_after = cert.not_valid_after.isoformat()
     sha1 = cert.fingerprint(hashes.SHA1())
     sha256 = cert.fingerprint(hashes.SHA256())
     md5 = cert.fingerprint(hashes.MD5())
@@ -173,10 +182,11 @@ def parse_metadata(xml_root):
                 pem = to_pem(cert_text)
                 try:
                     details = parse_cert_details(pem)
-                except Exception as e:
+                except (ValueError, UnsupportedAlgorithm):
                     # Non-standard encoding (e.g. GeneralizedTime in validity) —
                     # return a minimal stub so the cert PEM is still surfaced
-                    details = {"parse_error": str(e)}
+                    logger.warning("Certificate could not be decoded", exc_info=True)
+                    details = {"parse_error": "certificate could not be decoded"}
                 if use == "encryption":
                     certs_encryption.append(pem)
                     certs_encryption_details.append(details)

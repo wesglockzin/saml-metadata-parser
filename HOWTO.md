@@ -22,7 +22,7 @@ Built for the federation team setting up new SAML SP integrations: when a vendor
 
 ## Quick start — 30 seconds
 
-1. Sign in (work email; on VPN)
+1. Sign in
 2. Choose input mode:
    - **Paste XML** — copy the metadata from an email and paste it in
    - **Upload file** — drop an `.xml` file
@@ -89,7 +89,7 @@ Common causes:
 The error message usually points at the issue. If not, paste into a SAML metadata validator like samltool.com (external, public — don't paste sensitive metadata there) to confirm the doc is structurally valid.
 
 ### "Can I parse metadata from internal endpoints?"
-Only if this tool's container can reach them. For the organization-internal endpoints, the tool can hit them (internal network via the deployed app's network). For VPN-restricted endpoints, the tool may or may not have route — paste the XML instead.
+No. Fetch-URL mode refuses addresses that resolve to private, loopback or link-local space, and re-checks every redirect. Paste the XML instead.
 
 ### "Does this tool save anything I parse?"
 No persistence. Each parse is request-scoped — the parsed structure is rendered to HTML and discarded. PEMs are generated on download and not stored.
@@ -98,14 +98,12 @@ No persistence. Each parse is request-scoped — the parsed structure is rendere
 
 ## Architecture (for the nerds)
 
-- **Stack:** Flask + gunicorn, deployed to Azure Container Apps in `your-resource-group`
-- **Auth:** OIDC via the shared "Admin SSO App" app; `before_request` enforcer
+- **Stack:** Flask + gunicorn in a container
+- **Auth:** OpenID Connect with any provider; `before_request` enforcer
 - **Parser:** custom XML parser in `saml_ui_parser_logic.py` — extracts every relevant element under the `urn:oasis:names:tc:SAML:2.0:metadata` namespace
 - **Cert decoding:** `cryptography` library — parses X.509 certs from base64-encoded `X509Certificate` elements, extracts subject/issuer/validity/fingerprint
 - **PEM generation:** wraps the cert DER in standard `-----BEGIN CERTIFICATE-----` framing, served with `attachment` content-disposition
-- **Identity (for fetch-URL mode):** `SAMLMetadataParser/<APP_VERSION> (internal-tools)` UA — once the wes_tools_http integration is added (this version added the in-tool HOWTO; the HTTP-identity layer landed in the earlier fleet sweep)
-- **In-tool docs:** this page renders from `HOWTO.md` next to `app.py`, via `wes_tools_docs.register_howto()`
-- **Source:** `<internal-source-path>`
+- **In-tool docs:** this page renders from `HOWTO.md` next to `app.py`, via `howto.register_howto()`
 
 ## What's not here yet
 

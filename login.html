@@ -23,14 +23,7 @@
     <p>Sign in with your work email to continue.</p>
     <a class="btn" href="/oidc/login">Sign in</a>
     {% if login_error %}
-      {% if 'access_denied' in login_error %}
-      <div class="vpn">
-        <b>VPN required.</b> This app is restricted to the internal network. Connect to the VPN client, then click Sign in again.
-        <span class="raw">{{ login_error }}</span>
-      </div>
-      {% else %}
       <div class="err">{{ login_error }}</div>
-      {% endif %}
     {% endif %}
   </div>
   <footer>SAML Metadata Parser v{{ app_version }}</footer>

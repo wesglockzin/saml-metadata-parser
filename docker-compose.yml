@@ -1,0 +1,14 @@
+services:
+  saml-metadata-parser:
+    build: .
+    ports:
+      - "${PORT:-8080}:${PORT:-8080}"
+    environment:
+      PORT: "${PORT:-8080}"
+      AUTH_MODE: "${AUTH_MODE:-oidc}"
+      FLASK_SECRET_KEY: "${FLASK_SECRET_KEY:-}"
+      OIDC_ISSUER: "${OIDC_ISSUER:-}"
+      OIDC_CLIENT_ID: "${OIDC_CLIENT_ID:-}"
+      OIDC_CLIENT_SECRET: "${OIDC_CLIENT_SECRET:-}"
+      FORCE_HTTPS: "${FORCE_HTTPS:-false}"
+      VERIFY_SSL: "${VERIFY_SSL:-true}"
