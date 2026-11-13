@@ -58,6 +58,12 @@ def test_bad_auth_mode_rejected():
         create_app({"AUTH_MODE": "off"})
 
 
+@pytest.mark.parametrize("name", ["HTTP_TIMEOUT", "MAX_CONTENT_BYTES"])
+def test_non_numeric_setting_names_the_setting(name):
+    with pytest.raises(ConfigError, match=name):
+        create_app({"AUTH_MODE": "none", name: "abc"})
+
+
 # --- auth gate, health, redirects ---
 
 

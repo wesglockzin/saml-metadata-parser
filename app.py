@@ -42,6 +42,13 @@ def _flag(env, name, default):
     return env.get(name, default).strip().lower() in ("1", "true", "yes", "on")
 
 
+def _number(env, name, default, kind):
+    try:
+        return kind(env.get(name, default))
+    except ValueError as exc:
+        raise ConfigError(f"{name} must be a number") from exc
+
+
 def load_settings(env=None):
     """Read settings from environment variables; fail naming any missing one."""
     env = os.environ if env is None else env
@@ -56,8 +63,8 @@ def load_settings(env=None):
         "oidc_client_secret": env.get("OIDC_CLIENT_SECRET", ""),
         "force_https": _flag(env, "FORCE_HTTPS", "false"),
         "verify_ssl": _flag(env, "VERIFY_SSL", "true"),
-        "http_timeout": float(env.get("HTTP_TIMEOUT", "10")),
-        "max_bytes": int(env.get("MAX_CONTENT_BYTES", str(5 * 1024 * 1024))),
+        "http_timeout": _number(env, "HTTP_TIMEOUT", "10", float),
+        "max_bytes": _number(env, "MAX_CONTENT_BYTES", str(5 * 1024 * 1024), int),
     }
     if auth_mode == "oidc":
         for var, key in (

@@ -1,0 +1,3 @@
+[allowlist]
+description = "Plainly fake values used in tests"
+regexes = ['''test-key-not-real''', '''test-secret-not-real''']
