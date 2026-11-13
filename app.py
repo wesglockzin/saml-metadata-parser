@@ -39,7 +39,8 @@ class ConfigError(RuntimeError):
 
 
 def _flag(env, name, default):
-    return env.get(name, default).strip().lower() in ("1", "true", "yes", "on")
+    value = env.get(name, "").strip() or default
+    return value.strip().lower() in ("1", "true", "yes", "on")
 
 
 def _number(env, name, default, kind):
