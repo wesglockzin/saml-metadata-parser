@@ -26,18 +26,14 @@ def _sign_in(monkeypatch, userinfo):
 
 
 def test_allowed_email_signs_in(monkeypatch):
-    client, resp = _sign_in(
-        monkeypatch, {"email": "alice@example.invalid", "email_verified": True}
-    )
+    client, resp = _sign_in(monkeypatch, {"email": "alice@example.invalid", "email_verified": True})
     assert resp.status_code == 302
     with client.session_transaction() as sess:
         assert sess["user"]["email"] == "alice@example.invalid"
 
 
 def test_unverified_email_is_refused(monkeypatch):
-    client, _ = _sign_in(
-        monkeypatch, {"email": "alice@example.invalid", "email_verified": False}
-    )
+    client, _ = _sign_in(monkeypatch, {"email": "alice@example.invalid", "email_verified": False})
     with client.session_transaction() as sess:
         assert "user" not in sess
 
