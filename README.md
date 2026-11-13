@@ -23,7 +23,8 @@ AUTH_MODE=none python app.py     # http://127.0.0.1:8081, no sign-in
 
 Sign-in is on by default and uses any OpenID Connect provider. The app refuses
 to start if `FLASK_SECRET_KEY`, `OIDC_ISSUER`, `OIDC_CLIENT_ID` or
-`OIDC_CLIENT_SECRET` is missing, unless `AUTH_MODE=none` is set explicitly.
+`OIDC_CLIENT_SECRET` is missing, or if neither `ALLOWED_EMAILS` nor
+`ALLOWED_GROUPS` is set, unless `AUTH_MODE=none` is set explicitly.
 
 ## Settings
 
@@ -35,6 +36,7 @@ See `.env.example`.
 | `AUTH_MODE` | `oidc` | `oidc`, or `none` to run open (local use only) |
 | `FLASK_SECRET_KEY` | none | Session signing key. Required with `oidc` |
 | `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | none | OpenID Connect client. Required with `oidc` |
+| `ALLOWED_EMAILS`, `ALLOWED_GROUPS` | none | Comma-separated allow-list: the email claim or the `groups` claim must match. At least one is required with `oidc` |
 | `FORCE_HTTPS` | `true` with `oidc`, `false` with `none` | Secure cookies and HSTS; set `false` only for plain-HTTP local testing |
 | `VERIFY_SSL` | `true` | TLS verification when fetching a metadata URL |
 | `HTTP_TIMEOUT` | `10` | Seconds to wait for a metadata URL |
@@ -66,8 +68,8 @@ Tests need no network and no identity provider.
 - Results live in the signed session cookie. Metadata with many certificates
   can exceed the cookie size (about 4 KB) and drop the download.
 - `EntitiesDescriptor` wrappers (aggregate metadata) are not unwrapped.
-- There is no authorization rule beyond "signed in"; who may sign in is decided
-  at the identity provider.
+- The only POST (`/parse`) changes just the caller's own session cookie, which
+  is `SameSite=Lax`, so there is no separate CSRF token.
 - The page loads Pico CSS from a public CDN.
 
 ## License

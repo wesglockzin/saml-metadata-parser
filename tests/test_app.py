@@ -10,7 +10,59 @@ OIDC_ENV = {
     "OIDC_ISSUER": "https://issuer.example.invalid",
     "OIDC_CLIENT_ID": "test-client",
     "OIDC_CLIENT_SECRET": "test-secret-not-real",
+    "ALLOWED_EMAILS": "Alice@Example.invalid, bob@example.invalid",
+    "ALLOWED_GROUPS": "metadata-users",
 }
+
+
+def _sign_in(monkeypatch, userinfo):
+    monkeypatch.setattr(
+        "authlib.integrations.flask_client.FlaskOAuth2App.authorize_access_token",
+        lambda self: {"userinfo": userinfo},
+    )
+    client = create_app(OIDC_ENV).test_client()
+    resp = client.get("/oidc/callback")
+    return client, resp
+
+
+def test_allowed_email_signs_in(monkeypatch):
+    client, resp = _sign_in(monkeypatch, {"email": "alice@example.invalid"})
+    assert resp.status_code == 302
+    with client.session_transaction() as sess:
+        assert sess["user"]["email"] == "alice@example.invalid"
+
+
+def test_allowed_group_signs_in(monkeypatch):
+    client, _ = _sign_in(monkeypatch, {"email": "x@example.invalid", "groups": ["metadata-users"]})
+    with client.session_transaction() as sess:
+        assert "user" in sess
+
+
+def test_user_not_on_allow_list_is_refused(monkeypatch):
+    client, resp = _sign_in(monkeypatch, {"email": "eve@example.invalid", "groups": ["other"]})
+    assert resp.headers["Location"].endswith("/login")
+    with client.session_transaction() as sess:
+        assert "user" not in sess
+
+
+def test_oidc_mode_requires_an_allow_list():
+    env = {k: v for k, v in OIDC_ENV.items() if not k.startswith("ALLOWED_")}
+    with pytest.raises(ConfigError, match="ALLOWED_EMAILS"):
+        create_app(env)
+
+
+def test_main_binds_local_default_and_reads_port(monkeypatch):
+    import flask
+
+    seen = {}
+    monkeypatch.setattr(flask.Flask, "run", lambda self, **kw: seen.update(kw))
+    monkeypatch.setattr(app_module, "load_dotenv", lambda: None)
+    monkeypatch.delenv("HOST", raising=False)
+    monkeypatch.setenv("AUTH_MODE", "none")
+    monkeypatch.setenv("PORT", "9123")
+    app_module.main()
+    assert seen["host"] == "127.0.0.1"
+    assert seen["port"] == 9123
 
 
 class FakeResponse:

@@ -2,20 +2,20 @@
 
 ## TL;DR
 
-Drop a SAML metadata XML file in, get a human-readable breakdown of every field — entity IDs, ACS URLs, signing certs, supported NameID formats, attribute mappings — plus downloadable PEM files for each cert.
+Drop a SAML metadata XML file in, get a human-readable breakdown of the key fields — entity ID, role, SSO and ACS endpoints, signing and encryption certs, supported NameID formats — plus downloadable PEM files for each cert.
 
-Built for the federation team setting up new SAML SP integrations: when a vendor sends you their metadata, this tool tells you what's actually in it and saves the parts you need.
+Built for anyone setting up SAML SP integrations: when a vendor sends you their metadata, this tool tells you what's actually in it and saves the parts you need.
 
 ## What this tool is — and what it isn't
 
 **It is:**
 - A static metadata XML parser — paste, upload, or fetch by URL
-- Extracts every IdP/SP descriptor, certificate, endpoint, binding, attribute, NameID format
+- Extracts the entity ID, role, certificates, SSO/ACS endpoints, bindings and NameID formats
 - Lets you download individual signing/encryption certs as PEM files
-- Works for IdP metadata, SP metadata, or aggregates
+- Works for IdP metadata or SP metadata (aggregate `EntitiesDescriptor` files are not unwrapped)
 
 **It isn't:**
-- **Not a live SSO tester** — for that, use Federated Identity & Claims Analyzer
+- **Not a live SSO tester** — for that, use a live SSO testing tool
 - **Not a metadata validator** — it parses, it doesn't tell you whether the metadata satisfies your tenant's policy
 - **Not a config builder** — it doesn't generate metadata; it consumes it
 - **Not an SP onboarding workflow** — that's manual; this tool helps you understand what the vendor sent
@@ -38,7 +38,7 @@ Built for the federation team setting up new SAML SP integrations: when a vendor
 |---|---|
 | **Paste XML** | Vendor sent it inline, or you have a snippet to inspect |
 | **Upload file** | You saved the metadata locally and want to drop it in |
-| **Fetch URL** | Vendor gave you a metadata endpoint (e.g. Okta's `/sso/saml/metadata`) |
+| **Fetch URL** | Vendor gave you a metadata endpoint (a public HTTPS URL) |
 
 ### What you see after parsing
 
@@ -46,11 +46,10 @@ The output is organized by descriptor:
 
 | Section | What's in it |
 |---|---|
-| **EntityDescriptor** | Top-level entity ID, valid-until, role |
-| **IDPSSODescriptor** | If present: signing keys, supported bindings, SSO endpoints, NameID formats, attributes the IdP claims to release |
-| **SPSSODescriptor** | If present: encryption keys, ACS endpoints, SLO endpoints, required signature on assertions/responses, AssertionConsumerService bindings |
+| **EntityDescriptor** | Entity ID and role |
+| **IDPSSODescriptor** | If present: SSO endpoints with bindings, NameID formats, whether authn requests are signed |
+| **SPSSODescriptor** | If present: ACS endpoints with bindings, NameID formats, whether assertions are wanted signed |
 | **KeyDescriptor → cert** | Each cert decoded with subject, issuer, validity dates, key algorithm, fingerprint. **Click to download as PEM.** |
-| **AttributeConsumingService** | If present, SP-side declared attributes the app expects |
 
 ### Downloads
 
@@ -61,10 +60,10 @@ Each cert has a download button → saves as `.pem` with a sensible filename der
 ### "Vendor sent us metadata, what's in it?"
 - Paste / upload
 - Read the structured output
-- Note the ACS URL, entity ID, NameID format — those are the SP-side values you need on the Okta side
+- Note the ACS URL, entity ID, NameID format — those are the values you need to enter at your identity provider
 
-### "Extract the signing cert from an Okta metadata URL"
-- Fetch URL mode → paste the Okta metadata URL
+### "Extract the signing cert from a metadata URL"
+- Fetch URL mode → paste the metadata URL
 - Find the signing KeyDescriptor → click Download PEM
 
 ### "Compare two metadata documents"
@@ -92,7 +91,7 @@ The error message usually points at the issue. If not, paste into a SAML metadat
 No. Fetch-URL mode refuses addresses that resolve to private, loopback or link-local space, and re-checks every redirect. Paste the XML instead.
 
 ### "Does this tool save anything I parse?"
-No persistence. Each parse is request-scoped — the parsed structure is rendered to HTML and discarded. PEMs are generated on download and not stored.
+Nothing is stored on the server. The certificates from your last parse are kept in your signed session cookie so you can download them, and are gone when you sign out or the cookie is cleared.
 
 ---
 

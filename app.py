@@ -53,6 +53,21 @@ def _number(env, name, default, kind):
     return value
 
 
+def _csv(env, name, lower=False):
+    items = [i.strip() for i in env.get(name, "").split(",") if i.strip()]
+    return [i.lower() for i in items] if lower else items
+
+
+def is_allowed(settings, email, claims):
+    """True if the email or one of the group claims is on the allow-list."""
+    if email.lower() in settings["allowed_emails"]:
+        return True
+    groups = claims.get("groups") or []
+    if isinstance(groups, str):
+        groups = [groups]
+    return any(g in settings["allowed_groups"] for g in groups)
+
+
 def load_settings(env=None):
     """Read settings from environment variables; fail naming any missing one."""
     env = os.environ if env is None else env
@@ -71,6 +86,8 @@ def load_settings(env=None):
             "FORCE_HTTPS",
             env.get("FORCE_HTTPS", "").strip() or ("true" if auth_mode == "oidc" else "false"),
         ),
+        "allowed_emails": _csv(env, "ALLOWED_EMAILS", lower=True),
+        "allowed_groups": _csv(env, "ALLOWED_GROUPS"),
         "verify_ssl": _flag(env, "VERIFY_SSL", "true"),
         "http_timeout": _number(env, "HTTP_TIMEOUT", "10", float),
         "max_bytes": _number(env, "MAX_CONTENT_BYTES", str(5 * 1024 * 1024), int),
@@ -86,6 +103,11 @@ def load_settings(env=None):
                 raise ConfigError(
                     f"{var} is required (or set AUTH_MODE=none to run without sign-in)"
                 )
+        if not settings["allowed_emails"] and not settings["allowed_groups"]:
+            raise ConfigError(
+                "ALLOWED_EMAILS or ALLOWED_GROUPS is required "
+                "(or set AUTH_MODE=none to run without sign-in)"
+            )
     elif not settings["secret_key"]:
         logger.warning("FLASK_SECRET_KEY unset: using a per-process key; run a single worker")
         settings["secret_key"] = os.urandom(32).hex()
@@ -277,6 +299,10 @@ def create_app(env=None, *, fetch=None):
         email = claims.get("email") or claims.get("preferred_username")
         if not email:
             session["login_error"] = "No email claim was returned by the identity provider."
+            return redirect(url_for("login"))
+        if not is_allowed(settings, str(email), claims):
+            logger.warning("Sign-in refused: user is not on the allow-list")
+            session["login_error"] = "Your account is not allowed to use this app."
             return redirect(url_for("login"))
         session["user"] = {
             "email": email,
